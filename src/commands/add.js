@@ -94,7 +94,7 @@ export default {
     }
 
     const monsterId = monster.id;
-    let displayName = monster.name.charAt(0).toUpperCase() + monster.name.slice(1);
+    let displayName = monster.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     if (tempered) displayName = `Tempered ${displayName}`;
     const monsterEmoji = monster.emoji || "🐉";
 
@@ -115,7 +115,7 @@ export default {
         invMonster = resolved;
       }
 
-      const invMonsterName = invMonster.name.charAt(0).toUpperCase() + invMonster.name.slice(1);
+      const invMonsterName = invMonster.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
       if (quest === "Field Survey Quests") {
         if (invMonster.id !== monsterId) {
@@ -123,7 +123,7 @@ export default {
             sql: "INSERT INTO investigations (user_id, monster_id, remaining_uses) VALUES (?, ?, NULL)",
             args: [userId, invMonster.id],
           });
-          investigationId = invRes.lastInsertRowid;
+          investigationId = Number(invRes.lastInsertRowid);
           investigationLine = `**Field Survey:** ${invMonsterName}'s quest`;
         }
       } else {
@@ -132,11 +132,11 @@ export default {
             sql: "INSERT INTO investigations (user_id, monster_id, remaining_uses) VALUES (?, ?, ?)",
             args: [userId, invMonster.id, usesInput],
           });
-          investigationId = invRes.lastInsertRowid;
+          investigationId = Number(invRes.lastInsertRowid);
           investigationLine = `**Investigation:** ${invMonsterName} (${usesInput} use${usesInput !== 1 ? "s" : ""})`;
         } else {
           const existingRes = await db.execute({
-            sql: "SELECT id, remaining_uses FROM investigations WHERE user_id = ? AND monster_id = ? ORDER BY id DESC LIMIT 1",
+            sql: "SELECT id, remaining_uses FROM investigations WHERE user_id = ? AND monster_id = ? AND remaining_uses IS NOT NULL ORDER BY id DESC LIMIT 1",
             args: [userId, invMonster.id],
           });
 
@@ -149,7 +149,7 @@ export default {
               sql: "INSERT INTO investigations (user_id, monster_id, remaining_uses) VALUES (?, ?, ?)",
               args: [userId, invMonster.id, 3],
             });
-            investigationId = invRes.lastInsertRowid;
+            investigationId = Number(invRes.lastInsertRowid);
             investigationLine = `**Investigation:** ${invMonsterName} (3 uses)`;
           }
         }
