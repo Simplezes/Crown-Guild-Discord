@@ -143,7 +143,7 @@ export default {
       const reqRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setLabel("Open Guild Ledger")
-          .setURL(`http://localhost:3000/monster/${monsterUrlName}`)
+          .setURL(`https://crownguild.vercel.app/monster/${monsterUrlName}`)
           .setStyle(ButtonStyle.Link)
       );
 

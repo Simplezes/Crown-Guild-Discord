@@ -126,7 +126,7 @@ async function pollWebNotifications() {
                   .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
                   .setLabel("View Profile")
-                  .setURL(`http://localhost:3000/profile/${row.user_id}`)
+                  .setURL(`https://crownguild.vercel.app/profile/${row.user_id}`)
                   .setStyle(ButtonStyle.Link)
               );
 
