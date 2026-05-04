@@ -55,14 +55,14 @@ export default {
     .addStringOption((option) =>
       option
         .setName("host_monster")
-        .setDescription("Monster whose investigation or field survey this crown came from — only if different from the crown monster")
+        .setDescription("Host monster of the investigation or field survey — if different from the crown monster")
         .setRequired(false)
         .setAutocomplete(true)
     )
     .addIntegerOption((option) =>
       option
         .setName("uses")
-        .setDescription("Investigation only: force-create a NEW investigation with this many uses (1-3). Omit to auto-link existing.")
+        .setDescription("Uses for a new Investigation (1-3). Omit to auto-link to an existing one.")
         .setRequired(false)
         .setMinValue(1)
         .setMaxValue(3)
