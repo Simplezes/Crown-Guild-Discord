@@ -4,6 +4,7 @@ import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 
 export default {
   data: new SlashCommandBuilder()
@@ -23,7 +24,8 @@ export default {
         .setRequired(true)
         .addChoices(
           { name: "Small Crown", value: "small" },
-          { name: "Large Crown", value: "large" }
+          { name: "Large Crown", value: "large" },
+          { name: "Both Crowns", value: "both" }
         )
     )
     .addBooleanOption((option) =>
@@ -72,7 +74,9 @@ export default {
   },
   async execute(interaction) {
     const monsterName = interaction.options.getString("monster")?.toLowerCase().trim();
-    const type = interaction.options.getString("type");
+    const typeInput = interaction.options.getString("type");
+    const types = typeInput === "both" ? ["small", "large"] : [typeInput];
+    const pairId = types.length > 1 ? crypto.randomUUID() : null;
     const tempered = interaction.options.getBoolean("tempered");
     const quest = interaction.options.getString("quest");
     const strength = interaction.options.getInteger("strength");
@@ -156,16 +160,24 @@ export default {
       }
     }
 
-    await db.execute({
-      sql: `
-        INSERT INTO crowns(user_id, monster_id, type, tempered, strength_rating, quest, remaining_uses, investigation_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      args: [userId, monsterId, type, tempered ? 1 : 0, strength, quest, null, investigationId],
-    });
+    for (const type of types) {
+      await db.execute({
+        sql: `
+          INSERT INTO crowns(user_id, monster_id, type, tempered, strength_rating, quest, remaining_uses, investigation_id, pair_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [userId, monsterId, type, tempered ? 1 : 0, strength, quest, null, investigationId, pairId],
+      });
+    }
 
-    const typeEmoji = type === "small" ? E.smallCrown : E.largeCrown;
-    const typeLabel = type === "small" ? "Small Crown" : "Large Crown";
+    let typeEmoji, typeLabel;
+    if (typeInput === "both") {
+      typeEmoji = `${E.smallCrown} ${E.largeCrown}`;
+      typeLabel = "Small & Large Crowns";
+    } else {
+      typeEmoji = typeInput === "small" ? E.smallCrown : E.largeCrown;
+      typeLabel = typeInput === "small" ? "Small Crown" : "Large Crown";
+    }
 
     const descLines = [
       `Successfully recorded the ${typeEmoji} **${typeLabel}** for **${displayName}**!`,
