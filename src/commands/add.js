@@ -12,7 +12,7 @@ export default {
     .addStringOption((option) =>
       option
         .setName("monster")
-        .setDescription("The name of the monster")
+        .setDescription("The monster whose crown you obtained")
         .setRequired(true)
         .setAutocomplete(true)
     )
@@ -52,10 +52,17 @@ export default {
         .setMinValue(1)
         .setMaxValue(10)
     )
+    .addStringOption((option) =>
+      option
+        .setName("host_monster")
+        .setDescription("Monster whose investigation or field survey this crown came from — only if different from the crown monster")
+        .setRequired(false)
+        .setAutocomplete(true)
+    )
     .addIntegerOption((option) =>
       option
         .setName("uses")
-        .setDescription("Number of uses (max 3 for Investigations)")
+        .setDescription("Investigation only: force-create a NEW investigation with this many uses (1-3). Omit to auto-link existing.")
         .setRequired(false)
         .setMinValue(1)
         .setMaxValue(3)
@@ -69,6 +76,7 @@ export default {
     const tempered = interaction.options.getBoolean("tempered");
     const quest = interaction.options.getString("quest");
     const strength = interaction.options.getInteger("strength");
+    const hostMonsterInput = interaction.options.getString("host_monster")?.toLowerCase().trim();
     const usesInput = interaction.options.getInteger("uses");
     const userId = interaction.user.id;
 
@@ -78,7 +86,6 @@ export default {
     });
 
     const monster = await resolveMonsterName(monsterName);
-
     if (!monster) {
       return interaction.reply({
         content: `Monster **${monsterName}** not found. Please select one from the list!`,
@@ -88,29 +95,92 @@ export default {
 
     const monsterId = monster.id;
     let displayName = monster.name.charAt(0).toUpperCase() + monster.name.slice(1);
-    if (tempered) {
-      displayName = `Tempered ${displayName}`;
-    }
+    if (tempered) displayName = `Tempered ${displayName}`;
     const monsterEmoji = monster.emoji || "🐉";
-    const remainingUses = quest === "Investigation Quests" ? (usesInput || 3) : null;
+
+    let investigationId = null;
+    let investigationLine = "";
+
+    if (quest === "Investigation Quests" || quest === "Field Survey Quests") {
+      let invMonster = monster;
+
+      if (hostMonsterInput) {
+        const resolved = await resolveMonsterName(hostMonsterInput);
+        if (!resolved) {
+          return interaction.reply({
+            content: `Host monster **${hostMonsterInput}** not found. Please select one from the list!`,
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+        invMonster = resolved;
+      }
+
+      const invMonsterName = invMonster.name.charAt(0).toUpperCase() + invMonster.name.slice(1);
+
+      if (quest === "Field Survey Quests") {
+        if (invMonster.id !== monsterId) {
+          const invRes = await db.execute({
+            sql: "INSERT INTO investigations (user_id, monster_id, remaining_uses) VALUES (?, ?, NULL)",
+            args: [userId, invMonster.id],
+          });
+          investigationId = invRes.lastInsertRowid;
+          investigationLine = `**Field Survey:** ${invMonsterName}'s quest`;
+        }
+      } else {
+        if (usesInput) {
+          const invRes = await db.execute({
+            sql: "INSERT INTO investigations (user_id, monster_id, remaining_uses) VALUES (?, ?, ?)",
+            args: [userId, invMonster.id, usesInput],
+          });
+          investigationId = invRes.lastInsertRowid;
+          investigationLine = `**Investigation:** ${invMonsterName} (${usesInput} use${usesInput !== 1 ? "s" : ""})`;
+        } else {
+          const existingRes = await db.execute({
+            sql: "SELECT id, remaining_uses FROM investigations WHERE user_id = ? AND monster_id = ? ORDER BY id DESC LIMIT 1",
+            args: [userId, invMonster.id],
+          });
+
+          if (existingRes.rows.length > 0) {
+            const existing = existingRes.rows[0];
+            investigationId = existing.id;
+            investigationLine = `**Investigation:** ${invMonsterName} *(linked to existing, ${existing.remaining_uses} use${existing.remaining_uses !== 1 ? "s" : ""} left)*`;
+          } else {
+            const invRes = await db.execute({
+              sql: "INSERT INTO investigations (user_id, monster_id, remaining_uses) VALUES (?, ?, ?)",
+              args: [userId, invMonster.id, 3],
+            });
+            investigationId = invRes.lastInsertRowid;
+            investigationLine = `**Investigation:** ${invMonsterName} (3 uses)`;
+          }
+        }
+      }
+    }
 
     await db.execute({
       sql: `
-        INSERT INTO crowns(user_id, monster_id, type, tempered, strength_rating, quest, remaining_uses) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO crowns(user_id, monster_id, type, tempered, strength_rating, quest, remaining_uses, investigation_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      args: [userId, monsterId, type, tempered ? 1 : 0, strength, quest, remainingUses],
+      args: [userId, monsterId, type, tempered ? 1 : 0, strength, quest, null, investigationId],
     });
 
     const typeEmoji = type === "small" ? E.smallCrown : E.largeCrown;
     const typeLabel = type === "small" ? "Small Crown" : "Large Crown";
 
+    const descLines = [
+      `Successfully recorded the ${typeEmoji} **${typeLabel}** for **${displayName}**!`,
+      "",
+      `**Quest:** ${quest}`,
+      `**Strength:** ${strength}★`,
+    ];
+    if (investigationLine) descLines.push(investigationLine);
+
     const embed = new EmbedBuilder()
       .setTitle(`${monsterEmoji} Crown Added!`)
-      .setDescription(`Successfully recorded the ${typeEmoji} **${typeLabel}** for **${displayName}**!\n\n**Quest:** ${quest}\n**Strength:** ${strength}★`)
+      .setDescription(descLines.join("\n"))
       .setColor(0x57f287)
       .setTimestamp();
-    
+
     if (interaction.client.pusher) {
       interaction.client.pusher.trigger("public-channel", "crown_update", {});
     }

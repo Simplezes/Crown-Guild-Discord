@@ -74,27 +74,61 @@ export default {
     });
 
     const hostCrownRes = await db.execute({
-      sql: "SELECT id, quest, remaining_uses FROM crowns WHERE user_id = ? AND monster_id = ? AND type = ? AND tempered = ? AND strength_rating = ? ORDER BY remaining_uses ASC LIMIT 1",
+      sql: `SELECT c.id, c.quest, c.remaining_uses, c.investigation_id,
+                   inv.remaining_uses as inv_remaining_uses
+            FROM crowns c
+            LEFT JOIN investigations inv ON c.investigation_id = inv.id
+            WHERE c.user_id = ? AND c.monster_id = ? AND c.type = ? AND c.tempered = ? AND c.strength_rating = ?
+            ORDER BY COALESCE(inv.remaining_uses, c.remaining_uses) ASC LIMIT 1`,
       args: [hostId, mission.monster_id, mission.type, mission.tempered, mission.strength_rating]
     });
     const hostCrown = hostCrownRes.rows[0];
 
-    if (hostCrown && hostCrown.quest === "Investigation Quests" && hostCrown.remaining_uses !== null) {
-      const newUses = hostCrown.remaining_uses - 1;
-      if (newUses <= 0) {
-        await db.execute({
-          sql: "UPDATE web_notifications SET crown_id = NULL WHERE crown_id = ?",
-          args: [Number(hostCrown.id)]
-        });
-        await db.execute({
-          sql: "DELETE FROM crowns WHERE id = ?",
-          args: [Number(hostCrown.id)]
-        });
-      } else {
-        await db.execute({
-          sql: "UPDATE crowns SET remaining_uses = ? WHERE id = ?",
-          args: [Number(newUses), Number(hostCrown.id)]
-        });
+    if (hostCrown && hostCrown.quest === "Investigation Quests") {
+      if (hostCrown.investigation_id) {
+        const newUses = (hostCrown.inv_remaining_uses ?? 1) - 1;
+        if (newUses <= 0) {
+          const linkedRes = await db.execute({
+            sql: "SELECT id FROM crowns WHERE investigation_id = ?",
+            args: [Number(hostCrown.investigation_id)],
+          });
+          for (const lc of linkedRes.rows) {
+            await db.execute({
+              sql: "UPDATE web_notifications SET crown_id = NULL WHERE crown_id = ?",
+              args: [Number(lc.id)],
+            });
+          }
+          await db.execute({
+            sql: "DELETE FROM crowns WHERE investigation_id = ?",
+            args: [Number(hostCrown.investigation_id)],
+          });
+          await db.execute({
+            sql: "DELETE FROM investigations WHERE id = ?",
+            args: [Number(hostCrown.investigation_id)],
+          });
+        } else {
+          await db.execute({
+            sql: "UPDATE investigations SET remaining_uses = ? WHERE id = ?",
+            args: [newUses, Number(hostCrown.investigation_id)],
+          });
+        }
+      } else if (hostCrown.remaining_uses !== null) {
+        const newUses = hostCrown.remaining_uses - 1;
+        if (newUses <= 0) {
+          await db.execute({
+            sql: "UPDATE web_notifications SET crown_id = NULL WHERE crown_id = ?",
+            args: [Number(hostCrown.id)],
+          });
+          await db.execute({
+            sql: "DELETE FROM crowns WHERE id = ?",
+            args: [Number(hostCrown.id)],
+          });
+        } else {
+          await db.execute({
+            sql: "UPDATE crowns SET remaining_uses = ? WHERE id = ?",
+            args: [newUses, Number(hostCrown.id)],
+          });
+        }
       }
     }
 

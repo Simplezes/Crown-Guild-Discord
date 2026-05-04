@@ -109,7 +109,7 @@ export default {
     const monsterEmoji = monster.emoji || "🐉";
 
     const crownRes = await db.execute({
-      sql: "SELECT id FROM crowns WHERE user_id = ? AND monster_id = ? AND type = ? AND tempered = ? AND strength_rating = ? LIMIT 1",
+      sql: "SELECT id, investigation_id FROM crowns WHERE user_id = ? AND monster_id = ? AND type = ? AND tempered = ? AND strength_rating = ? LIMIT 1",
       args: [userId, monster.id, type, tempered ? 1 : 0, strength]
     });
 
@@ -125,16 +125,30 @@ export default {
     }
 
     const crownId = crownRes.rows[0].id;
+    const investigationId = crownRes.rows[0].investigation_id ?? null;
 
     await db.execute({
       sql: "UPDATE web_notifications SET crown_id = NULL WHERE crown_id = ?",
       args: [crownId],
     });
 
-    const res = await db.execute({
+    await db.execute({
       sql: "DELETE FROM crowns WHERE id = ?",
       args: [crownId],
     });
+
+    if (investigationId) {
+      const stillLinked = await db.execute({
+        sql: "SELECT COUNT(*) as c FROM crowns WHERE investigation_id = ?",
+        args: [investigationId],
+      });
+      if ((stillLinked.rows[0]?.c ?? 1) === 0) {
+        await db.execute({
+          sql: "DELETE FROM investigations WHERE id = ?",
+          args: [investigationId],
+        });
+      }
+    }
 
     const typeEmoji = type === "small" ? E.smallCrown : E.largeCrown;
     const typeLabel = type === "small" ? "Small Crown" : "Large Crown";

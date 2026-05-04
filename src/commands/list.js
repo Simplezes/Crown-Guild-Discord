@@ -15,9 +15,13 @@ export default {
 
     const res = await db.execute({
       sql: `
-        SELECT m.name, m.emoji, c.type, c.tempered, c.quest, c.remaining_uses, c.strength_rating
+        SELECT m.name, m.emoji, c.type, c.tempered, c.quest, c.strength_rating,
+               inv.remaining_uses as inv_remaining_uses,
+               inv_m.name        as inv_monster_name
         FROM crowns c
-        JOIN monsters m ON c.monster_id = m.id
+        JOIN  monsters m    ON c.monster_id      = m.id
+        LEFT JOIN investigations inv  ON c.investigation_id = inv.id
+        LEFT JOIN monsters       inv_m ON inv.monster_id    = inv_m.id
         WHERE c.user_id = ?
         ORDER BY m.name ASC, c.tempered DESC, c.strength_rating DESC, c.type ASC
       `,
@@ -42,8 +46,28 @@ export default {
 
       const crownEmoji = row.type === "small" ? E.smallCrown : E.largeCrown;
       const crownLabel = row.type === "small" ? "Small" : "Large";
-      const usesLabel = (row.quest === "Investigation Quests" && row.remaining_uses !== null) ? ` (${row.remaining_uses} left)` : "";
-      const questLabel = row.quest ? `*${row.quest}${usesLabel}*` : "";
+
+      let questLabel = "";
+      if (row.quest === "Investigation Quests") {
+        const uses     = row.inv_remaining_uses ?? 0;
+        const invName  = row.inv_monster_name
+          ? row.inv_monster_name.charAt(0).toUpperCase() + row.inv_monster_name.slice(1)
+          : null;
+        const hostPart = invName && invName.toLowerCase() !== row.name.toLowerCase()
+          ? `${invName} Investigation`
+          : "Investigation";
+        questLabel = `*${hostPart} (${uses} left)*`;
+      } else if (row.quest === "Field Survey Quests") {
+        const invName  = row.inv_monster_name
+          ? row.inv_monster_name.charAt(0).toUpperCase() + row.inv_monster_name.slice(1)
+          : null;
+        const hostPart = invName && invName.toLowerCase() !== row.name.toLowerCase()
+          ? `${invName} Field Survey`
+          : "Field Survey";
+        questLabel = `*${hostPart}*`;
+      } else if (row.quest) {
+        questLabel = `*${row.quest}*`;
+      }
 
       collection[keyName].crowns.push(`> ${crownEmoji} ${crownLabel} - ${row.strength_rating}★ ${questLabel ? "  -  " + questLabel : ""}`);
     });

@@ -52,6 +52,14 @@ export async function setupDatabase() {
       image_name TEXT,
       emoji TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS investigations (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id        TEXT    NOT NULL,
+      monster_id     INTEGER NOT NULL,
+      remaining_uses INTEGER,
+      FOREIGN KEY (user_id)    REFERENCES users(id),
+      FOREIGN KEY (monster_id) REFERENCES monsters(id)
+    )`,
     `CREATE TABLE IF NOT EXISTS crowns (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT,
@@ -61,6 +69,8 @@ export async function setupDatabase() {
       strength_rating INTEGER DEFAULT 1,
       quest TEXT,
       remaining_uses INTEGER,
+      investigation_id INTEGER REFERENCES investigations(id) ON DELETE SET NULL,
+      pair_id TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (monster_id) REFERENCES monsters(id)
     )`,
