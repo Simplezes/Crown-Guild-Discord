@@ -31,8 +31,30 @@ export default {
     .addBooleanOption((option) =>
       option
         .setName("tempered")
-        .setDescription("Is the monster Tempered?")
+        .setDescription("Is the monster Tempered? (Applies to Small Crown if adding both)")
         .setRequired(true)
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("strength")
+        .setDescription("Strength Rating (1-10 stars) (Applies to Small Crown if adding both)")
+        .setRequired(true)
+        .setMinValue(1)
+        .setMaxValue(10)
+    )
+    .addBooleanOption((option) =>
+      option
+        .setName("tempered_large")
+        .setDescription("Is the Large Crown Tempered? (Optional: Use only when adding Both Crowns)")
+        .setRequired(false)
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("strength_large")
+        .setDescription("Large Crown Strength (1-10 stars) (Optional: Use only when adding Both Crowns)")
+        .setRequired(false)
+        .setMinValue(1)
+        .setMaxValue(10)
     )
     .addStringOption((option) =>
       option
@@ -46,14 +68,7 @@ export default {
           { name: "Investigation Quests", value: "Investigation Quests" }
         )
     )
-    .addIntegerOption((option) =>
-      option
-        .setName("strength")
-        .setDescription("Strength Rating (1-10 stars)")
-        .setRequired(true)
-        .setMinValue(1)
-        .setMaxValue(10)
-    )
+
     .addStringOption((option) =>
       option
         .setName("host_monster")
@@ -78,8 +93,11 @@ export default {
     const types = typeInput === "both" ? ["small", "large"] : [typeInput];
     const pairId = types.length > 1 ? crypto.randomUUID() : null;
     const tempered = interaction.options.getBoolean("tempered");
-    const quest = interaction.options.getString("quest");
     const strength = interaction.options.getInteger("strength");
+    const temperedLarge = interaction.options.getBoolean("tempered_large");
+    const strengthLarge = interaction.options.getInteger("strength_large");
+
+    const quest = interaction.options.getString("quest");
     const hostMonsterInput = interaction.options.getString("host_monster")?.toLowerCase().trim();
     const usesInput = interaction.options.getInteger("uses");
     const userId = interaction.user.id;
@@ -160,14 +178,28 @@ export default {
       }
     }
 
+    const addedCrownsDesc = [];
+
     for (const type of types) {
+      let currentTempered = tempered;
+      let currentStrength = strength;
+
+      if (type === "large" && typeInput === "both") {
+        currentTempered = temperedLarge !== null ? temperedLarge : tempered;
+        currentStrength = strengthLarge !== null ? strengthLarge : strength;
+      }
+
       await db.execute({
         sql: `
           INSERT INTO crowns(user_id, monster_id, type, tempered, strength_rating, quest, remaining_uses, investigation_id, pair_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
-        args: [userId, monsterId, type, tempered ? 1 : 0, strength, quest, null, investigationId, pairId],
+        args: [userId, monsterId, type, currentTempered ? 1 : 0, currentStrength, quest, null, investigationId, pairId],
       });
+
+      const icon = type === "small" ? E.smallCrown : E.largeCrown;
+      const tLabel = type === "small" ? "Small" : "Large";
+      addedCrownsDesc.push(`- ${icon} **${tLabel}** (${currentStrength}★${currentTempered ? " Tempered" : ""})`);
     }
 
     let typeEmoji, typeLabel;
@@ -180,10 +212,10 @@ export default {
     }
 
     const descLines = [
-      `Successfully recorded the ${typeEmoji} **${typeLabel}** for **${displayName}**!`,
+      `Successfully recorded the following for **${displayName}**:`,
+      ...addedCrownsDesc,
       "",
       `**Quest:** ${quest}`,
-      `**Strength:** ${strength}★`,
     ];
     if (investigationLine) descLines.push(investigationLine);
 
