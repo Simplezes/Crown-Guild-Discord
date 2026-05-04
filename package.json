@@ -1,0 +1,21 @@
+{
+  "name": "crown-guild-bot",
+  "version": "1.0.0",
+  "description": "Crown Guild Discord Bot",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@libsql/client": "^0.17.3",
+    "discord.js": "^14.26.4",
+    "dotenv": "^17.4.2",
+    "pusher": "^5.3.3",
+    "pusher-js": "^8.5.0"
+  }
+}

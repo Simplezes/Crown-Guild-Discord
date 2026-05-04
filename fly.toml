@@ -1,0 +1,9 @@
+app = "crownguild-bot"
+primary_region = "iad"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+
+# No [[services]] or [http_service] since this is a Discord bot (worker), not a web server.
