@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from "discord.js";
+import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
@@ -7,83 +7,6 @@ import fs from "fs";
 import crypto from "crypto";
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName("add")
-    .setDescription("Add a monster crown to your collection")
-    .addStringOption((option) =>
-      option
-        .setName("monster")
-        .setDescription("The monster whose crown you obtained")
-        .setRequired(true)
-        .setAutocomplete(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("type")
-        .setDescription("The type of crown")
-        .setRequired(true)
-        .addChoices(
-          { name: "Small Crown", value: "small" },
-          { name: "Large Crown", value: "large" },
-          { name: "Both Crowns", value: "both" }
-        )
-    )
-    .addBooleanOption((option) =>
-      option
-        .setName("tempered")
-        .setDescription("Is the monster Tempered? (Applies to Small Crown if adding both)")
-        .setRequired(true)
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName("strength")
-        .setDescription("Strength Rating (1-10 stars) (Applies to Small Crown if adding both)")
-        .setRequired(true)
-        .setMinValue(1)
-        .setMaxValue(10)
-    )
-    .addBooleanOption((option) =>
-      option
-        .setName("tempered_large")
-        .setDescription("Is the Large Crown Tempered? (Optional: Use only when adding Both Crowns)")
-        .setRequired(false)
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName("strength_large")
-        .setDescription("Large Crown Strength (1-10 stars) (Optional: Use only when adding Both Crowns)")
-        .setRequired(false)
-        .setMinValue(1)
-        .setMaxValue(10)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("quest")
-        .setDescription("The type of quest")
-        .setRequired(true)
-        .addChoices(
-          { name: "Event Quests", value: "Event Quests" },
-          { name: "Optional Quests", value: "Optional Quests" },
-          { name: "Field Survey Quests", value: "Field Survey Quests" },
-          { name: "Investigation Quests", value: "Investigation Quests" }
-        )
-    )
-
-    .addStringOption((option) =>
-      option
-        .setName("host_monster")
-        .setDescription("Host monster of the investigation or field survey — if different from the crown monster")
-        .setRequired(false)
-        .setAutocomplete(true)
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName("uses")
-        .setDescription("Uses for a new Investigation (1-3). Omit to auto-link to an existing one.")
-        .setRequired(false)
-        .setMinValue(1)
-        .setMaxValue(3)
-    ),
   async autocomplete(interaction) {
     await handleMonsterAutocomplete(interaction);
   },
@@ -202,15 +125,6 @@ export default {
       addedCrownsDesc.push(`- ${icon} **${tLabel}** (${currentStrength}★${currentTempered ? " Tempered" : ""})`);
     }
 
-    let typeEmoji, typeLabel;
-    if (typeInput === "both") {
-      typeEmoji = `${E.smallCrown} ${E.largeCrown}`;
-      typeLabel = "Small & Large Crowns";
-    } else {
-      typeEmoji = typeInput === "small" ? E.smallCrown : E.largeCrown;
-      typeLabel = typeInput === "small" ? "Small Crown" : "Large Crown";
-    }
-
     const descLines = [
       `Successfully recorded the following for **${displayName}**:`,
       ...addedCrownsDesc,
@@ -241,5 +155,3 @@ export default {
     await interaction.reply({ embeds: [embed], files, flags: MessageFlags.Ephemeral });
   },
 };
-
-

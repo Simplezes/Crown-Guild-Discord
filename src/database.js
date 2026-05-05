@@ -90,6 +90,35 @@ export async function setupDatabase() {
       FOREIGN KEY (host_id) REFERENCES users(id),
       FOREIGN KEY (monster_id) REFERENCES monsters(id),
       FOREIGN KEY (crown_id) REFERENCES crowns(id) ON DELETE SET NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS wishlist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT,
+      monster_id INTEGER,
+      type TEXT CHECK(type IN ('small', 'large', 'both')),
+      tempered INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (monster_id) REFERENCES monsters(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS active_flares (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      host_id TEXT,
+      monster_id INTEGER,
+      type TEXT,
+      tempered INTEGER,
+      strength_rating INTEGER,
+      session_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (host_id) REFERENCES users(id),
+      FOREIGN KEY (monster_id) REFERENCES monsters(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS flare_queue (
+      flare_id INTEGER,
+      user_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (flare_id, user_id),
+      FOREIGN KEY (flare_id) REFERENCES active_flares(id) ON DELETE CASCADE
     )`
   ], "write");
 

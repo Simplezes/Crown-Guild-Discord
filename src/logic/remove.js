@@ -1,63 +1,19 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from "discord.js";
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from "discord.js";
 import db from "../database.js";
-import { handleMonsterAutocomplete } from "../utils.js";
+import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
 import path from "path";
 import fs from "fs";
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName("remove")
-    .setDescription("Remove crowns from your collection")
-    .addSubcommand((sub) =>
-      sub
-        .setName("crown")
-        .setDescription("Remove a specific monster crown from your collection")
-        .addStringOption((option) =>
-          option
-            .setName("monster")
-            .setDescription("The name of the monster")
-            .setRequired(true)
-            .setAutocomplete(true)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("type")
-            .setDescription("The type of crown")
-            .setRequired(true)
-            .addChoices(
-              { name: "Small Crown", value: "small" },
-              { name: "Large Crown", value: "large" }
-            )
-        )
-        .addBooleanOption((option) =>
-          option
-            .setName("tempered")
-            .setDescription("Is the monster Tempered?")
-            .setRequired(true)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("strength")
-            .setDescription("Strength Rating (1-10 stars)")
-            .setRequired(true)
-            .setMinValue(1)
-            .setMaxValue(10)
-        )
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName("all")
-        .setDescription("Clear your ENTIRE crown collection")
-    ),
   async autocomplete(interaction) {
     await handleMonsterAutocomplete(interaction);
   },
-  async execute(interaction) {
-    const sub = interaction.options.getSubcommand();
+  async execute(interaction, subOverride = null) {
+    const sub = subOverride || interaction.options.getSubcommand();
     const userId = interaction.user.id;
 
-    if (sub === "all") {
+    if (sub === "reset" || sub === "all") {
       const countRes = await db.execute({
         sql: "SELECT COUNT(*) as total FROM crowns WHERE user_id = ?",
         args: [userId],
@@ -92,10 +48,6 @@ export default {
 
     const monsterName = interaction.options.getString("monster")?.toLowerCase().trim();
     const type = interaction.options.getString("type");
-    const tempered = interaction.options.getBoolean("tempered");
-    const strength = interaction.options.getInteger("strength");
-
-    const { resolveMonsterName } = await import("../utils.js");
     const monster = await resolveMonsterName(monsterName);
 
     if (!monster) {
@@ -109,23 +61,22 @@ export default {
     const monsterEmoji = monster.emoji || "🐉";
 
     const crownRes = await db.execute({
-      sql: "SELECT id, investigation_id FROM crowns WHERE user_id = ? AND monster_id = ? AND type = ? AND tempered = ? AND strength_rating = ? LIMIT 1",
-      args: [userId, monster.id, type, tempered ? 1 : 0, strength]
+      sql: "SELECT id, investigation_id, tempered, strength_rating FROM crowns WHERE user_id = ? AND monster_id = ? AND type = ? ORDER BY id DESC LIMIT 1",
+      args: [userId, monster.id, type]
     });
 
     if (crownRes.rows.length === 0) {
       const typeEmoji = type === "small" ? E.smallCrown : E.largeCrown;
       const typeLabel = type === "small" ? "Small Crown" : "Large Crown";
-      const finalDisplayName = tempered ? `Tempered ${displayName}` : displayName;
-      const displaySuffix = `(${strength}★)`;
       return interaction.reply({
-        content: `${monsterEmoji} You don't have the ${typeEmoji} **${typeLabel}** for **${finalDisplayName}** ${displaySuffix} in your collection.`,
+        content: `${monsterEmoji} You don't have a ${typeEmoji} **${typeLabel}** for **${displayName}** in your collection.`,
         flags: MessageFlags.Ephemeral,
       });
     }
 
-    const crownId = crownRes.rows[0].id;
-    const investigationId = crownRes.rows[0].investigation_id ?? null;
+    const crown = crownRes.rows[0];
+    const crownId = crown.id;
+    const investigationId = crown.investigation_id ?? null;
 
     await db.execute({
       sql: "UPDATE web_notifications SET crown_id = NULL WHERE crown_id = ?",
@@ -152,9 +103,8 @@ export default {
 
     const typeEmoji = type === "small" ? E.smallCrown : E.largeCrown;
     const typeLabel = type === "small" ? "Small Crown" : "Large Crown";
-    const finalDisplayName = tempered ? `Tempered ${displayName}` : displayName;
-    const displaySuffix = `(${strength}★)`;
-
+    const finalDisplayName = crown.tempered ? `Tempered ${displayName}` : displayName;
+    const displaySuffix = `(${crown.strength_rating}★)`;
 
     const embed = new EmbedBuilder()
       .setTitle(`${monsterEmoji} Crown Removed`)

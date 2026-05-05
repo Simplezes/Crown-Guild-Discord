@@ -70,6 +70,37 @@ export async function handleCrownedMonsterAutocomplete(interaction) {
   }
 }
 
+export async function handleMyCrownedMonsterAutocomplete(interaction) {
+  const focusedValue = interaction.options.getFocused().toLowerCase();
+  const userId = interaction.user.id;
+
+  try {
+    const res = await db.execute({
+      sql: `
+        SELECT DISTINCT m.name
+        FROM crowns c
+        JOIN monsters m ON c.monster_id = m.id
+        WHERE c.user_id = ? AND m.name LIKE ?
+        ORDER BY m.name ASC
+        LIMIT 25
+      `,
+      args: [userId, `%${focusedValue}%`],
+    });
+
+    const choices = res.rows.map(row => {
+      const displayName = row.name.charAt(0).toUpperCase() + row.name.slice(1);
+      return {
+        name: displayName,
+        value: row.name,
+      };
+    });
+
+    await interaction.respond(choices);
+  } catch (error) {
+    console.error("[Autocomplete] Error in my crowned autocomplete:", error);
+    await interaction.respond([]);
+  }
+}
 
 export async function ensureMonsterInDb(monsterName) {
   let normalized = monsterName.toLowerCase().trim();

@@ -26,7 +26,7 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN);
   try {
     console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
-    const route = process.env.DISCORD_GUILD_ID 
+    const route = process.env.DISCORD_GUILD_ID
       ? Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID)
       : Routes.applicationCommands(process.env.DISCORD_CLIENT_ID);
 

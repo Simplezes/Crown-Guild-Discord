@@ -3,147 +3,101 @@ import path from "path";
 import fs from "fs";
 import { E } from "../emojis.js";
 
-const DETAILS = {
-  add: {
-    title: "📥  /add - Log a Crown",
+const GROUPS = {
+  crown: {
+    title: "👑  /crown - Collection Management",
     fields: [
-      { name: "What it does", value: "Records a crown you earned to your personal collection.", inline: false },
       {
-        name: "Options", value: [
-          `> **monster** - The monster name *(autocomplete supported)*`,
-          `> **type** - \`Small Crown\` or \`Large Crown\``,
-          `> **tempered** - Was it Tempered? \`Yes\` or \`No\``,
-          `> **quest** - The quest type you ran`,
-          `> **strength** - Strength Rating (1-10 stars)`,
-          `> **uses** - Remaining uses *(Investigation Quests only)*`,
+        name: "Actions", value: [
+          "> `add` - Log a new crown you've earned",
+          "> `remove` - Delete a specific crown entry",
+          "> `list` - View your collection (or another hunter's)",
+          "> `reset` - Clear your entire collection",
         ].join("\n"), inline: false
-      },
-      { name: "Notes", value: "> Adding the same monster + type again will update the existing entry.", inline: false },
-    ],
+      }
+    ]
   },
-  list: {
-    title: "📋  /list - View Your Collection",
+  hunt: {
+    title: "⚔️  /hunt - Multiplayer Activities",
     fields: [
-      { name: "What it does", value: "Shows all crowns you have logged, grouped by monster.", inline: false },
       {
-        name: "Notes", value: [
-          "> Paginated with **← Prev / Next →** buttons if you have many crowns.",
-          "> Visible only to you.",
+        name: "Actions", value: [
+          "> `flare` - Broadcast a hunt you are hosting",
+          "> `radar` - Scan for active SOS flares",
+          "> `find` - Search the global registry for specific holders",
+          "> `match` - Find mutual matches (those who need what you have)",
+          "> `done` - Mark your active hunt as completed",
         ].join("\n"), inline: false
-      },
-    ],
+      }
+    ]
   },
-  remove: {
-    title: "🗑️  /remove - Remove Crowns",
+  wishlist: {
+    title: "📝  /wishlist - Missing Crowns",
     fields: [
       {
-        name: "/remove crown", value: [
-          "> Removes one specific crown from your collection.",
-          "> **monster** - The monster name",
-          "> **type** - `Small Crown` or `Large Crown`",
+        name: "Actions", value: [
+          "> `add` - Add a crown you are looking for",
+          "> `remove` - Remove from your list",
+          "> `view` - See your current wishlist",
         ].join("\n"), inline: false
-      },
-      { name: "/remove all", value: "> Deletes your **entire** collection. Requires you to confirm via a button.", inline: false },
-    ],
-  },
-  find: {
-    title: `${E.communication}  /find - Browse & Request Crowns`,
-    fields: [
-      { name: "/find", value: "> Shows the full guild crown registry. Browse with pagination.", inline: false },
-      {
-        name: "/find monster:{name}", value: [
-          "> Shows who holds Small and Large crowns for that monster.",
-          "> Click **Request Small Crown** or **Request Large Crown** to broadcast a 60-second LFG ping.",
-          "> A host with that crown can click **✅ Accept** - the bot verifies ownership automatically.",
-          "> The host's Lobby ID appears in the mission embed if they've set one via `/settings`.",
-        ].join("\n"), inline: false
-      },
-    ],
-  },
-  complete: {
-    title: `${E.notesCheckmark}  /complete - Finish a Mission`,
-    fields: [
-      { name: "What it does", value: "Marks your active mission as complete and posts a public success message.", inline: false },
-      {
-        name: "Rules", value: [
-          "> Only the **requester** can run this - not the host.",
-          "> You can only have **one active mission** at a time.",
-          "> Missions expire automatically after **50 minutes** if not completed.",
-        ].join("\n"), inline: false
-      },
-    ],
+      }
+    ]
   },
   profile: {
-    title: `${E.expeditionBoard}  /profile - Hunter Card`,
+    title: `${E.expeditionBoard}  /profile - Personal Info`,
     fields: [
-      { name: "What it does", value: "Displays a detailed Guild Hunter Card for you or another player.", inline: false },
-      { name: "Options", value: "> **user** *(optional)* - View someone else's profile by mentioning them.", inline: false },
       {
-        name: "Shows", value: [
-          "> Crown breakdown (Small / Large / Tempered)",
-          "> Quests hosted & joined",
-          "> Registry completion %",
-          "> Top assist crown",
-          "> Default lobby info",
+        name: "Actions", value: [
+          "> `view` - See your Hunter Card and stats",
+          "> `settings` - Configure Lobby ID, Password, and DMs",
         ].join("\n"), inline: false
-      },
-    ],
-  },
-  settings: {
-    title: `${E.settings}  /settings - Lobby Configuration`,
-    fields: [
-      { name: "What it does", value: "Saves your default Lobby ID and Quest Password to your profile.", inline: false },
-      {
-        name: "Options", value: [
-          "> **lobby_id** *(optional)* - Your session/lobby ID",
-          "> **password** *(optional)* - Your quest password",
-        ].join("\n"), inline: false
-      },
-      { name: "Notes", value: "> These appear automatically when someone accepts your hosting request, so they know where to join.", inline: false },
-    ],
+      }
+    ]
   },
   monster: {
-    title: "📖  /monster - Monster Info",
+    title: "📖  /monster - Bestiary",
     fields: [
-      { name: "What it does", value: "Displays lore, type, elements, weaknesses, and ailments for any monster.", inline: false },
-      { name: "Options", value: "> **name** - The monster to look up *(autocomplete & fuzzy search supported)*", inline: false },
-    ],
-  },
+      {
+        name: "Actions", value: [
+          "> `info` - View weaknesses, elements, and lore",
+        ].join("\n"), inline: false
+      }
+    ]
+  }
 };
 
 export default {
   data: new SlashCommandBuilder()
     .setName("help")
-    .setDescription("View all Crown Guild commands")
+    .setDescription("View the Crown Guild command guide")
+    .setIntegrationTypes(0, 1)
+    .setContexts(0, 1, 2)
     .addStringOption((opt) =>
       opt
-        .setName("command")
-        .setDescription("Get detailed help for a specific command")
+        .setName("category")
+        .setDescription("Get detailed help for a specific command group")
         .setRequired(false)
         .addChoices(
-          { name: "/add", value: "add" },
-          { name: "/list", value: "list" },
-          { name: "/remove", value: "remove" },
-          { name: "/find", value: "find" },
-          { name: "/complete", value: "complete" },
+          { name: "/crown", value: "crown" },
+          { name: "/hunt", value: "hunt" },
+          { name: "/wishlist", value: "wishlist" },
           { name: "/profile", value: "profile" },
-          { name: "/settings", value: "settings" },
           { name: "/monster", value: "monster" },
         )
     ),
   async execute(interaction) {
     const iconPath = path.join(process.cwd(), "icon.png");
     const files = fs.existsSync(iconPath) ? [{ attachment: iconPath, name: "icon.png" }] : [];
-    const commandKey = interaction.options.getString("command");
+    const category = interaction.options.getString("category");
 
-    if (commandKey && DETAILS[commandKey]) {
-      const detail = DETAILS[commandKey];
+    if (category && GROUPS[category]) {
+      const group = GROUPS[category];
       const embed = new EmbedBuilder()
-        .setAuthor({ name: "Crown Guild  •  Command Help", iconURL: "attachment://icon.png" })
-        .setTitle(detail.title)
+        .setAuthor({ name: "Crown Guild  •  Group Help", iconURL: "attachment://icon.png" })
+        .setTitle(group.title)
         .setColor(0xC4982A)
-        .addFields(...detail.fields)
-        .setFooter({ text: "Run /help to see all commands", iconURL: "attachment://icon.png" });
+        .addFields(...group.fields)
+        .setFooter({ text: "Run /help to see all categories", iconURL: "attachment://icon.png" });
 
       return interaction.reply({ embeds: [embed], files, flags: MessageFlags.Ephemeral });
     }
@@ -152,38 +106,15 @@ export default {
       .setAuthor({ name: "Crown Guild  •  Command Guide", iconURL: "attachment://icon.png" })
       .setColor(0xC4982A)
       .setThumbnail("attachment://icon.png")
-      .setDescription("> 💡 Tip: Use `/help command:` for detailed info on any command!")
+      .setDescription("The Crown Guild is now easier to navigate! Use the grouped commands below:")
       .addFields(
-        {
-          name: "🗂️  Collection",
-          value: [
-            "`/add` - Log a crown",
-            "`/list` - View your collection",
-            "`/remove crown` - Remove a crown",
-            "`/remove all` - Clear everything",
-          ].join("\n"),
-          inline: true,
-        },
-        {
-          name: `${E.communication}  Matchmaking`,
-          value: [
-            "`/find` - Browse crown registry",
-            "`/find monster:` - Find holders & request",
-            "`/complete` - Mark your mission done",
-          ].join("\n"),
-          inline: true,
-        },
-        {
-          name: `${E.expeditionBoard}  Profile`,
-          value: [
-            "`/profile` - View your Hunter Card",
-            "`/settings` - Set Lobby ID & password",
-            "`/monster` - Look up a monster",
-          ].join("\n"),
-          inline: true,
-        }
+        { name: "👑  /crown", value: "Manage your monster crown collection.", inline: true },
+        { name: "⚔️  /hunt", value: "SOS flares, Radar, and Matchmaking.", inline: true },
+        { name: "📝  /wishlist", value: "Track the crowns you are seeking.", inline: true },
+        { name: "👤  /profile", value: "View your card and set your Lobby ID.", inline: true },
+        { name: "📖  /monster", value: "Lookup weaknesses and bestiary info.", inline: true }
       )
-      .setFooter({ text: "Crown Guild Official Registry  •  Happy Hunting!", iconURL: "attachment://icon.png" });
+      .setFooter({ text: "Type / then select a group to see all actions!", iconURL: "attachment://icon.png" });
 
     await interaction.reply({ embeds: [embed], files, flags: MessageFlags.Ephemeral });
   },

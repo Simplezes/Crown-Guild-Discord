@@ -1,6 +1,53 @@
 import { Events } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
+import { buildFlareEmbed, buildFlareButtons } from "../logic/flare.js";
+
+async function refreshFlareEmbed(client, flareId) {
+  try {
+    const flareRes = await db.execute({
+      sql: `SELECT f.*, u.username as host_name, m.name as monster_name, m.emoji, u2.lobby_id,
+                   f.discord_message_id, f.discord_channel_id
+            FROM active_flares f
+            JOIN users u ON f.host_id = u.id
+            JOIN monsters m ON f.monster_id = m.id
+            LEFT JOIN users u2 ON f.host_id = u2.id
+            WHERE f.id = ?`,
+      args: [flareId]
+    });
+    if (!flareRes.rows[0]?.discord_message_id) return;
+
+    const flare = flareRes.rows[0];
+    const membersRes = await db.execute({
+      sql: "SELECT u.username FROM active_flare_queue q JOIN users u ON q.user_id = u.id WHERE q.flare_id = ?",
+      args: [flareId]
+    });
+
+    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    let displayName = flare.monster_name.split(' ').map(capitalize).join(' ');
+    if (flare.tempered) displayName = `Tempered ${displayName}`;
+    const typeLabel = flare.type === 'small' ? "Small Crown" : "Large Crown";
+    const { E: Emojis } = await import("../emojis.js");
+    const typeEmoji = flare.type === 'small' ? Emojis.smallCrown : Emojis.largeCrown;
+
+    const embed = buildFlareEmbed({
+      displayName, monsterEmoji: flare.emoji, typeEmoji, typeLabel,
+      strengthRating: flare.strength_rating,
+      hostUsername: flare.host_name,
+      sessionId: flare.session_id,
+      members: membersRes.rows,
+    });
+
+    const channel = await client.channels.fetch(flare.discord_channel_id).catch(() => null);
+    if (!channel) return;
+    const msg = await channel.messages.fetch(flare.discord_message_id).catch(() => null);
+    if (!msg) return;
+
+    await msg.edit({ embeds: [embed], components: [buildFlareButtons(flareId)] }).catch(() => { });
+  } catch (e) {
+    console.error("Error refreshing flare embed:", e);
+  }
+}
 
 async function syncUser(interaction) {
   try {
@@ -163,13 +210,72 @@ export default {
             authorName: "Crown Guild  •  Crown Registry",
             authorIconUrl: "attachment://icon.png",
             thumbnailUrl: "attachment://icon.png",
-            footerSuffix: "Use /find monster: to see holders & request a crown",
+            footerSuffix: "Use /hunt find monster: to see holders & request a crown",
             stateKey,
             files: files2,
           };
           const { embeds, components } = buildPage(null, entries, newPage, opts);
           return interaction.update({ embeds, components, files: files2 });
         }
+
+      } else if (customId.startsWith("join_flare_")) {
+        const flareId = parseInt(customId.split("_")[2]);
+        const userId = interaction.user.id;
+
+        const flareRes = await db.execute({ sql: "SELECT id, host_id FROM active_flares WHERE id = ?", args: [flareId] });
+        if (flareRes.rows.length === 0) {
+          const { MessageFlags } = await import("discord.js");
+          return interaction.reply({ content: "This SOS flare has expired or been closed.", flags: MessageFlags.Ephemeral });
+        }
+        if (flareRes.rows[0].host_id === userId) {
+          const { MessageFlags } = await import("discord.js");
+          return interaction.reply({ content: "You are the host — you can't join your own flare!", flags: MessageFlags.Ephemeral });
+        }
+
+        try {
+          await db.execute({ sql: "INSERT INTO active_flare_queue (flare_id, user_id) VALUES (?, ?)", args: [flareId, userId] });
+          await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'join' }).catch(() => { });
+          await refreshFlareEmbed(interaction.client, flareId);
+          const { MessageFlags } = await import("discord.js");
+          return interaction.reply({ content: "✅ Joined the strike team queue!", flags: MessageFlags.Ephemeral });
+        } catch (e) {
+          const { MessageFlags } = await import("discord.js");
+          return interaction.reply({ content: "You are already in this queue.", flags: MessageFlags.Ephemeral });
+        }
+
+      } else if (customId.startsWith("leave_flare_")) {
+        const flareId = parseInt(customId.split("_")[2]);
+        const userId = interaction.user.id;
+
+        await db.execute({ sql: "DELETE FROM active_flare_queue WHERE flare_id = ? AND user_id = ?", args: [flareId, userId] });
+        await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'leave' }).catch(() => { });
+        await refreshFlareEmbed(interaction.client, flareId);
+        const { MessageFlags } = await import("discord.js");
+        return interaction.reply({ content: "🚪 You've left the queue.", flags: MessageFlags.Ephemeral });
+
+      } else if (customId.startsWith("close_flare_")) {
+        const flareId = parseInt(customId.split("_")[2]);
+        const userId = interaction.user.id;
+
+        const flareRes = await db.execute({ sql: "SELECT host_id FROM active_flares WHERE id = ?", args: [flareId] });
+        if (flareRes.rows.length === 0) {
+          const { MessageFlags } = await import("discord.js");
+          return interaction.reply({ content: "This flare is already closed.", flags: MessageFlags.Ephemeral });
+        }
+        if (flareRes.rows[0].host_id !== userId) {
+          const { MessageFlags } = await import("discord.js");
+          return interaction.reply({ content: "Only the host can close this flare.", flags: MessageFlags.Ephemeral });
+        }
+
+        await db.execute({ sql: "DELETE FROM active_flares WHERE id = ?", args: [flareId] });
+        await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'close' }).catch(() => { });
+
+        const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = await import("discord.js");
+        const disabledRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`closed_1`).setLabel("Flare Closed").setStyle(ButtonStyle.Danger).setDisabled(true)
+        );
+        await interaction.update({ components: [disabledRow] }).catch(() => { });
+        return;
 
       } else if (customId.startsWith("accept_req_") || customId.startsWith("host_choose_")) {
         const parts = customId.split("_");
@@ -272,7 +378,7 @@ export default {
         });
         if (requesterCheck.rows.length > 0) {
           return interaction.followUp({
-            content: "This hunter already has an active mission in progress! They must `/complete` it first.",
+            content: "This hunter already has an active mission in progress! They must use `/hunt done` first.",
             flags: MessageFlags.Ephemeral
           });
         }
@@ -314,7 +420,7 @@ export default {
             user_id: requesterId,
             monster_id: Number(monsterId)
           });
-          interaction.client.pusher.trigger("public-channel", "notification", { 
+          interaction.client.pusher.trigger("public-channel", "notification", {
             type: 'hunt_accepted',
             recipient_id: requesterId
           });
@@ -343,7 +449,7 @@ export default {
 
         const embed = new EmbedBuilder()
           .setTitle("<:MHWildsHunt_Icon:1500270140682404001> Mission Undergoing!")
-          .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${hostId}>\n**Requester:** <@${requesterId}>\n**Target:** ${m.emoji || "🐉"} **${displayParts}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/complete\`!`)
+          .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${hostId}>\n**Requester:** <@${requesterId}>\n**Target:** ${m.emoji || "🐉"} **${displayParts}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/hunt done\`!`)
           .setColor(0x3498DB);
 
         if (isChoose) {
@@ -453,6 +559,66 @@ export default {
           interaction.client.pusher.trigger("public-channel", "mission_update", {});
         }
 
+      } else if (customId.startsWith("join_flare_")) {
+        const flareId = parseInt(customId.replace("join_flare_", ""));
+        const userId = interaction.user.id;
+
+        const { MessageFlags, EmbedBuilder } = await import("discord.js");
+
+        const flareRes = await db.execute({
+          sql: `SELECT f.*, u.username as host_name, m.name as monster_name, m.emoji 
+                FROM active_flares f 
+                JOIN users u ON f.host_id = u.id 
+                JOIN monsters m ON f.monster_id = m.id 
+                WHERE f.id = ?`,
+          args: [flareId]
+        });
+
+        if (flareRes.rows.length === 0) {
+          return interaction.reply({ content: "This flare has expired or been removed.", flags: MessageFlags.Ephemeral });
+        }
+
+        const flare = flareRes.rows[0];
+        if (flare.host_id === userId) {
+          return interaction.reply({ content: "You cannot join your own flare queue!", flags: MessageFlags.Ephemeral });
+        }
+
+        try {
+          await db.execute({
+            sql: "INSERT INTO flare_queue (flare_id, user_id) VALUES (?, ?)",
+            args: [flareId, userId]
+          });
+        } catch (e) {
+          return interaction.reply({ content: "You are already in the queue for this flare!", flags: MessageFlags.Ephemeral });
+        }
+
+        const queueRes = await db.execute({
+          sql: "SELECT user_id FROM flare_queue WHERE flare_id = ? ORDER BY created_at ASC",
+          args: [flareId]
+        });
+
+        const queueList = queueRes.rows.map((r, i) => `${i + 1}. <@${r.user_id}>`).join("\n");
+
+        const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+        let displayName = flare.monster_name.split(' ').map(capitalize).join(' ');
+        if (flare.tempered) displayName = `Tempered ${displayName}`;
+        const typeLabel = flare.type === 'small' ? "Small Crown" : "Large Crown";
+        const typeEmoji = flare.type === 'small' ? (flare.type === 'small' ? E.smallCrown : E.largeCrown) : "👑";
+
+        const oldEmbed = interaction.message.embeds[0];
+        const embed = EmbedBuilder.from(oldEmbed)
+          .setDescription([
+            `**${flare.host_name}** is hosting a hunt for ${flare.emoji} **${displayName}**!`,
+            `> **Target:** ${typeEmoji} ${typeLabel} (${flare.strength_rating}★)`,
+            `> **Status:** Waiting for hunters...`,
+            "",
+            `**Queue:**`,
+            queueList,
+            "",
+            `Click the button below to join the queue! The host will see your interest.`,
+          ].join("\n"));
+
+        await interaction.update({ embeds: [embed] });
       } else if (customId.startsWith("cancel_delete_account_")) {
         const ownerId = customId.replace("cancel_delete_account_", "");
         if (interaction.user.id !== ownerId) {
