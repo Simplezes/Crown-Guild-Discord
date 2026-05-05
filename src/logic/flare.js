@@ -2,8 +2,6 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlag
 import db from "../database.js";
 import { handleMyCrownedMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
-import path from "path";
-import fs from "fs";
 
 const WEB_HUB_URL = process.env.WEB_HUB_URL || "https://crownguild.vercel.app";
 
@@ -111,16 +109,11 @@ export default {
 
     const row = buildFlareButtons(flareId);
 
-    const files = [];
     if (monster.image_name) {
-      const iconPath = path.join(process.cwd(), "src/database/monsters", monster.image_name);
-      if (fs.existsSync(iconPath)) {
-        embed.setThumbnail(`attachment://${monster.image_name}`);
-        files.push({ attachment: iconPath, name: monster.image_name });
-      }
+      embed.setThumbnail(`${WEB_HUB_URL}/monsters/${monster.image_name}`);
     }
 
-    await interaction.reply({ embeds: [embed], components: [row], files });
+    await interaction.reply({ embeds: [embed], components: [row] });
     const msg = await interaction.fetchReply();
 
     await db.execute({

@@ -40,5 +40,5 @@ export function buildPage(title, entries, page = 0, opts = {}) {
     components.push(buildNavRow(page, totalPages, opts.stateKey || "x"));
   }
 
-  return { embeds: [embed], components, files: opts.files || [] };
+  return { embeds: [embed], components };
 }

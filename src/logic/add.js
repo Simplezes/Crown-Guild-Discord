@@ -2,9 +2,9 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
-import path from "path";
-import fs from "fs";
 import crypto from "crypto";
+
+const WEB_BASE_URL = "https://crownguild.vercel.app";
 
 export default {
   async autocomplete(interaction) {
@@ -143,15 +143,10 @@ export default {
       interaction.client.pusher.trigger("public-channel", "crown_update", {});
     }
 
-    const files = [];
     if (monster.image_name) {
-      const iconPath = path.join(process.cwd(), "src/database/monsters", monster.image_name);
-      if (fs.existsSync(iconPath)) {
-        embed.setThumbnail(`attachment://${monster.image_name}`);
-        files.push({ attachment: iconPath, name: monster.image_name });
-      }
+      embed.setThumbnail(`${WEB_BASE_URL}/monsters/${monster.image_name}`);
     }
 
-    await interaction.reply({ embeds: [embed], files, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

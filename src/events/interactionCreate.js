@@ -116,8 +116,7 @@ export default {
 
         const { buildPage, PAGE_SIZE } = await import("../pagination.js");
         const { MessageFlags } = await import("discord.js");
-        const path = await import("path");
-        const fs = await import("fs");
+        const WEB_BASE_URL = "https://crownguild.vercel.app";
 
         let entries = [];
         let title = "";
@@ -152,9 +151,6 @@ export default {
             return `**${data.monsterEmoji} ${displayName}**\n> ${data.emojis.join("  •  ")}`;
           });
 
-          const iconPath = path.join(process.cwd(), "icon.png");
-          const files = fs.existsSync(iconPath) ? [{ attachment: iconPath, name: "icon.png" }] : [];
-
           const target = await interaction.client.users.fetch(userId).catch(() => null);
           const targetName = target ? target.username : "Hunter";
           const targetAvatar = target ? target.displayAvatarURL() : undefined;
@@ -163,15 +159,14 @@ export default {
             color: 0xC4982A,
             authorName: `${targetName}  •  Crown Collection`,
             authorIconUrl: targetAvatar,
-            thumbnailUrl: "attachment://icon.png",
+            thumbnailUrl: `${WEB_BASE_URL}/icon.png`,
             footerSuffix: `${Object.keys(collection).length} monsters tracked`,
             footerIconUrl: targetAvatar,
             stateKey,
-            files,
           };
 
           const { embeds, components } = buildPage(null, entries, newPage, opts);
-          return interaction.update({ embeds, components, files: opts.files });
+          return interaction.update({ embeds, components });
 
         } else if (stateKey === "find_all") {
           const res = await db.execute({
@@ -203,20 +198,16 @@ export default {
             return `**${data.emoji}  ${displayParts}**\n${smallLine}\n${largeLine}`;
           });
 
-          const iconPath2 = path.join(process.cwd(), "icon.png");
-          const files2 = fs.existsSync(iconPath2) ? [{ attachment: iconPath2, name: "icon.png" }] : [];
-
           opts = {
             color: 0xC4982A,
             authorName: "Crown Guild  •  Crown Registry",
-            authorIconUrl: "attachment://icon.png",
-            thumbnailUrl: "attachment://icon.png",
+            authorIconUrl: `${WEB_BASE_URL}/icon.png`,
+            thumbnailUrl: `${WEB_BASE_URL}/icon.png`,
             footerSuffix: "Use /hunt find monster: to see holders & request a crown",
             stateKey,
-            files: files2,
           };
           const { embeds, components } = buildPage(null, entries, newPage, opts);
-          return interaction.update({ embeds, components, files: files2 });
+          return interaction.update({ embeds, components });
         }
 
       } else if (customId.startsWith("join_flare_")) {

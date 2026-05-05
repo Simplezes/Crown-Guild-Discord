@@ -3,8 +3,8 @@ import db from "../database.js";
 import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import { buildPage } from "../pagination.js";
 import { E } from "../emojis.js";
-import path from "path";
-import fs from "fs";
+
+const WEB_BASE_URL = "https://crownguild.vercel.app";
 
 export default {
   async autocomplete(interaction) {
@@ -43,21 +43,19 @@ export default {
         return `**${data.emoji}  ${displayParts}**\n${smallLine}\n${largeLine}`;
       });
 
-      const iconPath = path.join(process.cwd(), "icon.png");
-      const files = fs.existsSync(iconPath) ? [{ attachment: iconPath, name: "icon.png" }] : [];
+      const iconUrl = `${WEB_BASE_URL}/icon.png`;
 
       const opts = {
         color: 0xC4982A,
         authorName: "Crown Guild  •  Crown Registry",
-        authorIconUrl: "attachment://icon.png",
-        thumbnailUrl: "attachment://icon.png",
+        authorIconUrl: iconUrl,
+        thumbnailUrl: iconUrl,
         footerSuffix: "Use /hunt find monster: to see holders & request a crown",
         stateKey: "find_all",
-        files,
       };
 
       const { embeds, components } = buildPage(null, entries, 0, opts);
-      return interaction.reply({ embeds, components, files, flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds, components, flags: MessageFlags.Ephemeral });
     }
 
     const monster = await resolveMonsterName(monsterName);
@@ -100,15 +98,8 @@ export default {
       .setTimestamp();
 
     if (monster.image_name) {
-      const iconPath = path.join(process.cwd(), "src/database/monsters", monster.image_name);
-      if (fs.existsSync(iconPath)) {
-        embed.setThumbnail(`attachment://${monster.image_name}`);
-        await interaction.reply({ embeds: [embed], files: [{ attachment: iconPath, name: monster.image_name }], flags: MessageFlags.Ephemeral });
-      } else {
-        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-      }
-    } else {
-      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      embed.setThumbnail(`${WEB_BASE_URL}/monsters/${monster.image_name}`);
     }
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

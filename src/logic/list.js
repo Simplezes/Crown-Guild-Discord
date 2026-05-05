@@ -1,9 +1,9 @@
 import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
-import path from "path";
-import fs from "fs";
 import { buildPage } from "../pagination.js";
+
+const WEB_BASE_URL = "https://crownguild.vercel.app";
 
 export default {
   async execute(interaction) {
@@ -45,21 +45,17 @@ export default {
       return `**${data.monsterEmoji} ${displayName}**\n> ${data.emojis.join("  •  ")}`;
     });
 
-    const iconPath = path.join(process.cwd(), "icon.png");
-    const files = fs.existsSync(iconPath) ? [{ attachment: iconPath, name: "icon.png" }] : [];
-
     const opts = {
       color: 0xC4982A,
       authorName: `${targetUser.username}  •  Crown Collection`,
       authorIconUrl: targetUser.displayAvatarURL(),
-      thumbnailUrl: "attachment://icon.png",
+      thumbnailUrl: `${WEB_BASE_URL}/icon.png`,
       footerSuffix: `${Object.keys(collection).length} monsters tracked`,
       footerIconUrl: targetUser.displayAvatarURL(),
       stateKey: `list_${userId}`,
-      files,
     };
 
     const { embeds, components } = buildPage(null, entries, 0, opts);
-    await interaction.reply({ embeds, components, files: opts.files, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds, components, flags: MessageFlags.Ephemeral });
   },
 };
