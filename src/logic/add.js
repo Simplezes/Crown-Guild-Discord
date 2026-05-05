@@ -14,11 +14,15 @@ export default {
     const monsterName = interaction.options.getString("monster")?.toLowerCase().trim();
     const typeInput = interaction.options.getString("type");
     const types = typeInput === "both" ? ["small", "large"] : [typeInput];
-    const pairId = types.length > 1 ? crypto.randomUUID() : null;
     const tempered = interaction.options.getBoolean("tempered");
     const strength = interaction.options.getInteger("strength");
     const temperedLarge = interaction.options.getBoolean("tempered_large");
     const strengthLarge = interaction.options.getInteger("strength_large");
+
+    const monster2Name = interaction.options.getString("monster2")?.toLowerCase().trim();
+    const type2Input = interaction.options.getString("type2");
+    const tempered2 = interaction.options.getBoolean("tempered2");
+    const strength2 = interaction.options.getInteger("strength2");
 
     const quest = interaction.options.getString("quest");
     const hostMonsterInput = interaction.options.getString("host_monster")?.toLowerCase().trim();
@@ -41,6 +45,31 @@ export default {
     const monsterId = monster.id;
     let displayName = formatMonsterName(monster.name, tempered);
     const monsterEmoji = monster.emoji || "🐉";
+
+    let monster2 = null;
+    if (monster2Name) {
+      if (!type2Input) {
+        return interaction.reply({
+          content: `Please specify the crown type (\`type2\`) for the second monster!`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      monster2 = await resolveMonsterName(monster2Name);
+      if (!monster2) {
+        return interaction.reply({
+          content: `Second monster **${monster2Name}** not found. Please select one from the list!`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      if (monster2.id === monsterId) {
+        return interaction.reply({
+          content: `The second monster must be different from the first! Use \`type: Both Crowns\` to add both crowns for the same monster.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    }
+
+    const pairId = (types.length > 1 || monster2) ? crypto.randomUUID() : null;
 
     let investigationId = null;
     let investigationLine = "";
@@ -124,13 +153,37 @@ export default {
       addedCrownsDesc.push(`- ${icon} **${tLabel}** (${currentStrength}★${currentTempered ? " Tempered" : ""})`);
     }
 
+    let monster2Desc = [];
+    if (monster2 && type2Input) {
+      const types2 = type2Input === "both" ? ["small", "large"] : [type2Input];
+      const m2DisplayName = formatMonsterName(monster2.name, tempered2);
+      const m2Emoji = monster2.emoji || "🐉";
+      for (const type of types2) {
+        const t2 = tempered2 ? 1 : 0;
+        const s2 = strength2 || 1;
+        await db.execute({
+          sql: `
+            INSERT INTO crowns(user_id, monster_id, type, tempered, strength_rating, quest, remaining_uses, investigation_id, pair_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          args: [userId, monster2.id, type, t2, s2, quest, null, investigationId, pairId],
+        });
+        const icon = type === "small" ? E.smallCrown : E.largeCrown;
+        const tLabel = type === "small" ? "Small" : "Large";
+        monster2Desc.push(`- ${icon} **${tLabel}** (${s2}★${tempered2 ? " Tempered" : ""})`);
+      }
+      monster2Desc = [`\n${m2Emoji} **${m2DisplayName}**:`, ...monster2Desc];
+    }
+
     const descLines = [
       `Successfully recorded the following for **${displayName}**:`,
       ...addedCrownsDesc,
+      ...monster2Desc,
       "",
       `**Quest:** ${quest}`,
     ];
     if (investigationLine) descLines.push(investigationLine);
+    if (monster2) descLines.push(`> Same-quest pairing recorded — both monsters are linked!`);
 
     const embed = new EmbedBuilder()
       .setTitle(`${monsterEmoji} Crown Added!`)

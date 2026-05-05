@@ -86,6 +86,38 @@ export default {
             .setMinValue(1)
             .setMaxValue(3)
         )
+        .addStringOption((option) =>
+          option
+            .setName("monster2")
+            .setDescription("Second monster in the same quest (if different)")
+            .setRequired(false)
+            .setAutocomplete(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("type2")
+            .setDescription("Crown type for the second monster")
+            .setRequired(false)
+            .addChoices(
+              { name: "Small Crown", value: "small" },
+              { name: "Large Crown", value: "large" },
+              { name: "Both Crowns", value: "both" }
+            )
+        )
+        .addBooleanOption((option) =>
+          option
+            .setName("tempered2")
+            .setDescription("Is the second monster Tempered?")
+            .setRequired(false)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("strength2")
+            .setDescription("Second monster crown strength (1-10 stars)")
+            .setRequired(false)
+            .setMinValue(1)
+            .setMaxValue(10)
+        )
     )
     .addSubcommand((sub) =>
       sub
