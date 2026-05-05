@@ -27,7 +27,7 @@ The Discord half of Crown Guild. Handles slash commands for logging crowns, find
 | `/hunt flare` | Broadcast a hunt you are hosting (SOS Flare) |
 | `/hunt radar` | Scan for active SOS flares and crown hunts |
 | `/hunt find` | Search the global registry for specific crown holders |
-| `/hunt match` | Find mutual matches — hunters who need what you have |
+| `/hunt match` | Find mutual matches hunters who need what you have |
 | `/hunt done` | Mark your active hunt as completed |
 | `/wishlist add` | Add a crown you are looking for |
 | `/wishlist remove` | Remove a crown from your wishlist |
