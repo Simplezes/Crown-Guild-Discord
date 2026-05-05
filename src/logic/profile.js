@@ -1,8 +1,6 @@
 import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
-import path from "path";
-import fs from "fs";
 
 export default {
   async execute(interaction) {
@@ -71,9 +69,6 @@ export default {
       embed.addFields({ name: "⭐ Top Assist", value: `${topAssist.emoji} **${topAssist.name}** (Shared ${topAssist.count} times)`, inline: false });
     }
 
-    const iconPath = path.join(process.cwd(), "icon.png");
-    const files = fs.existsSync(iconPath) ? [{ attachment: iconPath, name: "icon.png" }] : [];
-
-    await interaction.reply({ embeds: [embed], files, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };
