@@ -2,8 +2,9 @@ import { Events } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
 import { buildFlareEmbed, buildFlareButtons } from "../logic/flare.js";
+import { randomUUID } from "crypto";
 
-async function refreshFlareEmbed(client, flareId) {
+export async function refreshFlareEmbed(client, flareId) {
   try {
     const flareRes = await db.execute({
       sql: `SELECT f.*, u.username as host_name, m.name as monster_name, m.emoji, u2.lobby_id,
@@ -43,7 +44,7 @@ async function refreshFlareEmbed(client, flareId) {
     const msg = await channel.messages.fetch(flare.discord_message_id).catch(() => null);
     if (!msg) return;
 
-    await msg.edit({ embeds: [embed], components: [buildFlareButtons(flareId)] }).catch(() => { });
+    await msg.edit({ embeds: [embed], components: [buildFlareButtons(flareId)], attachments: [] }).catch(() => { });
   } catch (e) {
     console.error("Error refreshing flare embed:", e);
   }
@@ -232,6 +233,12 @@ export default {
           return interaction.reply({ content: "You are the host — you can't join your own flare!", flags: MessageFlags.Ephemeral });
         }
 
+        const queueCountRes = await db.execute({ sql: "SELECT COUNT(*) as count FROM active_flare_queue WHERE flare_id = ?", args: [flareId] });
+        if (Number(queueCountRes.rows[0].count) >= 4) {
+          const { MessageFlags } = await import("discord.js");
+          return interaction.reply({ content: "This party is already full! (4/4 hunters)", flags: MessageFlags.Ephemeral });
+        }
+
         try {
           await db.execute({ sql: "INSERT INTO active_flare_queue (flare_id, user_id) VALUES (?, ?)", args: [flareId, userId] });
           await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'join' }).catch(() => { });
@@ -247,10 +254,15 @@ export default {
         const flareId = parseInt(customId.split("_")[2]);
         const userId = interaction.user.id;
 
-        await db.execute({ sql: "DELETE FROM active_flare_queue WHERE flare_id = ? AND user_id = ?", args: [flareId, userId] });
-        await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'leave' }).catch(() => { });
-        await refreshFlareEmbed(interaction.client, flareId);
         const { MessageFlags } = await import("discord.js");
+        const inQueue = await db.execute({ sql: "SELECT 1 FROM active_flare_queue WHERE flare_id = ? AND user_id = ?", args: [flareId, userId] });
+        if (inQueue.rows.length === 0) {
+          return interaction.reply({ content: "You are not in this queue.", flags: MessageFlags.Ephemeral });
+        }
+
+        await db.execute({ sql: "DELETE FROM active_flare_queue WHERE flare_id = ? AND user_id = ?", args: [flareId, userId] });
+        await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'leave', flareId }).catch(() => { });
+        await refreshFlareEmbed(interaction.client, flareId);
         return interaction.reply({ content: "🚪 You've left the queue.", flags: MessageFlags.Ephemeral });
 
       } else if (customId.startsWith("close_flare_")) {
@@ -276,6 +288,218 @@ export default {
         );
         await interaction.update({ components: [disabledRow] }).catch(() => { });
         return;
+
+      } else if (customId.startsWith("start_flare_")) {
+        const flareId = parseInt(customId.split("_")[2]);
+        const userId = interaction.user.id;
+
+        const { MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = await import("discord.js");
+
+        const flareRes = await db.execute({
+          sql: `SELECT f.*, u.username as host_name, u.lobby_id, m.name as monster_name, m.emoji
+                FROM active_flares f
+                JOIN users u ON f.host_id = u.id
+                JOIN monsters m ON f.monster_id = m.id
+                WHERE f.id = ?`,
+          args: [flareId]
+        });
+
+        if (flareRes.rows.length === 0) {
+          return interaction.reply({ content: "This flare has already been closed.", flags: MessageFlags.Ephemeral });
+        }
+
+        const flare = flareRes.rows[0];
+        if (flare.host_id !== userId) {
+          return interaction.reply({ content: "Only the host can start the quest.", flags: MessageFlags.Ephemeral });
+        }
+
+        const queueRes = await db.execute({
+          sql: "SELECT u.id as user_id, u.username FROM active_flare_queue q JOIN users u ON q.user_id = u.id WHERE q.flare_id = ? ORDER BY q.created_at ASC LIMIT 4",
+          args: [flareId]
+        });
+
+        const hunters = queueRes.rows;
+        const groupId = randomUUID();
+
+        for (const hunter of hunters) {
+          const missionCheck = await db.execute({
+            sql: "SELECT 1 FROM active_missions WHERE requester_id = ?",
+            args: [hunter.user_id]
+          });
+          if (missionCheck.rows.length > 0) continue;
+
+          await db.execute({ sql: "INSERT OR IGNORE INTO users(id) VALUES (?)", args: [hunter.user_id] });
+          await db.execute({
+            sql: "INSERT INTO active_missions (host_id, requester_id, monster_id, type, tempered, strength_rating, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            args: [userId, hunter.user_id, flare.monster_id, flare.type, flare.tempered, flare.strength_rating, groupId]
+          });
+          await db.execute({
+            sql: "UPDATE web_notifications SET status = 'cancelled' WHERE user_id = ? AND status IN ('pending', 'sent') AND type IN ('sos_flare', 'beacon')",
+            args: [hunter.user_id]
+          });
+          await db.execute({
+            sql: `INSERT INTO web_notifications (user_id, host_id, recipient_id, type, monster_id, crown_id, status)
+                  VALUES (?, ?, ?, 'hunt_accepted', ?, (SELECT id FROM crowns WHERE user_id = ? AND monster_id = ? AND type = ? LIMIT 1), 'pending')`,
+            args: [hunter.user_id, userId, hunter.user_id, flare.monster_id, userId, flare.monster_id, flare.type]
+          });
+          await interaction.client.pusher.trigger("public-channel", "notification", {
+            type: 'hunt_accepted',
+            recipient_id: hunter.user_id
+          }).catch(() => { });
+        }
+
+        await db.execute({ sql: "DELETE FROM active_flares WHERE id = ?", args: [flareId] });
+        await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'started' }).catch(() => { });
+        await interaction.client.pusher.trigger("public-channel", "mission_update", {}).catch(() => { });
+        await interaction.client.pusher.trigger("public-channel", "notification_updated", {}).catch(() => { });
+
+        const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+        let displayName = flare.monster_name.split(' ').map(capitalize).join(' ');
+        if (flare.tempered) displayName = `Tempered ${displayName}`;
+        const typeLabel = flare.type === 'small' ? "Small Crown" : "Large Crown";
+        const hunterList = hunters.length > 0
+          ? hunters.map(h => `> 🗡️ **${h.username}**`).join("\n")
+          : "> *No hunters were in queue*";
+        const lobbyLine = flare.lobby_id ? `> **Lobby ID:** \`${flare.lobby_id}\`` : "";
+
+        const embed = new EmbedBuilder()
+          .setTitle(`⚔️ Quest Started: ${displayName}!`)
+          .setDescription([
+            `**${flare.host_name}** has launched the hunt for ${flare.emoji} **${displayName}**!`,
+            `> **Target:** ${typeLabel} (${flare.strength_rating}★)`,
+            lobbyLine,
+            "",
+            `**Strike Team (${hunters.length}/4):**`,
+            hunterList,
+            "",
+            `Missions assigned. Use \`/hunt done\` when you get the crown!`,
+          ].filter(Boolean).join("\n"))
+          .setColor(0x2ECC71)
+          .setTimestamp();
+
+        const doneRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`quest_started_1`).setLabel("⚔️ Quest Started!").setStyle(ButtonStyle.Success).setDisabled(true)
+        );
+        await interaction.update({ embeds: [embed], components: [doneRow] }).catch(() => { });
+        return;
+
+      } else if (customId.startsWith("quest_timeout_yes_")) {
+        const missionId = parseInt(customId.split("_")[3]);
+        const userId = interaction.user.id;
+        const { EmbedBuilder } = await import("discord.js");
+
+        const missionRes = await db.execute({
+          sql: `SELECT m.*, mon.name as monster_name, mon.emoji
+                FROM active_missions m
+                JOIN monsters mon ON m.monster_id = mon.id
+                WHERE m.id = ? AND m.requester_id = ?`,
+          args: [missionId, userId]
+        });
+
+        if (missionRes.rows.length === 0) {
+          return interaction.update({ content: "This mission has already been resolved.", embeds: [], components: [] });
+        }
+
+        const mission = missionRes.rows[0];
+        const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+        let displayName = mission.monster_name.split(' ').map(capitalize).join(' ');
+        if (mission.tempered) displayName = `Tempered ${displayName}`;
+        const typeLabel = mission.type === 'small' ? "Small Crown" : "Large Crown";
+
+        if (mission.group_id) {
+          await db.execute({ sql: "UPDATE active_missions SET hunter_confirmed = 1 WHERE id = ?", args: [mission.id] });
+
+          const groupRes = await db.execute({ sql: "SELECT * FROM active_missions WHERE group_id = ?", args: [mission.group_id] });
+          const allConfirmed = groupRes.rows.every(m => m.hunter_confirmed === 1);
+
+          if (allConfirmed) {
+            for (const m of groupRes.rows) {
+              await db.execute({
+                sql: "UPDATE users SET shared_crowns = shared_crowns + 1 WHERE id = ?",
+                args: [m.host_id]
+              });
+              await db.execute({
+                sql: "UPDATE users SET missions_completed = missions_completed + 1 WHERE id = ?",
+                args: [m.requester_id]
+              });
+              await db.execute({
+                sql: "INSERT INTO completed_missions (host_id, requester_id, monster_id, type, tempered, strength_rating) VALUES (?, ?, ?, ?, ?, ?)",
+                args: [m.host_id, m.requester_id, m.monster_id, m.type, m.tempered, m.strength_rating]
+              });
+            }
+            // Deduct investigation once for the host
+            const fm = groupRes.rows[0];
+            const invRes = await db.execute({
+              sql: `SELECT c.id, c.investigation_id,
+                           COALESCE(inv.remaining_uses, c.remaining_uses) as remaining_uses,
+                           inv.id as inv_id
+                    FROM crowns c
+                    LEFT JOIN investigations inv ON c.investigation_id = inv.id
+                    WHERE c.user_id = ? AND c.monster_id = ? AND c.type = ? AND c.tempered = ? AND c.strength_rating = ?
+                    AND c.quest = 'Investigation Quests'
+                    ORDER BY remaining_uses ASC LIMIT 1`,
+              args: [fm.host_id, fm.monster_id, fm.type, fm.tempered, fm.strength_rating]
+            });
+            const hc = invRes.rows[0];
+            if (hc && hc.remaining_uses !== null) {
+              const newUses = hc.remaining_uses - 1;
+              if (newUses <= 0) {
+                await db.execute({ sql: "DELETE FROM crowns WHERE id = ?", args: [hc.id] });
+                if (hc.inv_id) await db.execute({ sql: "DELETE FROM investigations WHERE id = ?", args: [hc.inv_id] });
+              } else if (hc.inv_id) {
+                await db.execute({ sql: "UPDATE investigations SET remaining_uses = ? WHERE id = ?", args: [newUses, hc.inv_id] });
+              } else {
+                await db.execute({ sql: "UPDATE crowns SET remaining_uses = ? WHERE id = ?", args: [newUses, hc.id] });
+              }
+            }
+            await db.execute({ sql: "DELETE FROM active_missions WHERE group_id = ?", args: [mission.group_id] });
+            interaction.client.pusher?.trigger("public-channel", "mission_update", { status: 'completed', groupId: mission.group_id }).catch(() => {});
+            interaction.client.pusher?.trigger("public-channel", "crown_update", {}).catch(() => {});
+          } else {
+            interaction.client.pusher?.trigger("public-channel", "mission_update", { type: 'group_confirmed' }).catch(() => {});
+          }
+
+          const embed = new EmbedBuilder()
+            .setTitle(allConfirmed ? "✅ Group Quest Complete!" : "✅ Crown Confirmed!")
+            .setDescription(allConfirmed
+              ? `All hunters confirmed! Quest complete for **${displayName}**.`
+              : `Your crown for **${displayName}** has been logged. Waiting for other hunters...`)
+            .setColor(0x2ECC71).setTimestamp();
+          return interaction.update({ embeds: [embed], components: [] });
+        } else {
+          await db.execute({
+            sql: "INSERT INTO completed_missions (host_id, requester_id, monster_id, type, tempered, strength_rating) VALUES (?, ?, ?, ?, ?, ?)",
+            args: [mission.host_id, mission.requester_id, mission.monster_id, mission.type, mission.tempered, mission.strength_rating]
+          });
+          await db.execute({ sql: "DELETE FROM active_missions WHERE id = ?", args: [mission.id] });
+          interaction.client.pusher?.trigger("public-channel", "mission_update", { status: 'completed', hostId: mission.host_id, requesterId: mission.requester_id }).catch(() => {});
+          interaction.client.pusher?.trigger("public-channel", "crown_update", {}).catch(() => {});
+
+          const embed = new EmbedBuilder()
+            .setTitle("✅ Mission Complete!")
+            .setDescription(`Crown confirmed for **${displayName}** (${typeLabel})!`)
+            .setColor(0x2ECC71).setTimestamp();
+          return interaction.update({ embeds: [embed], components: [] });
+        }
+
+      } else if (customId.startsWith("quest_timeout_no_")) {
+        const missionId = parseInt(customId.split("_")[3]);
+        const userId = interaction.user.id;
+        const { EmbedBuilder } = await import("discord.js");
+
+        const missionRes = await db.execute({ sql: "SELECT 1 FROM active_missions WHERE id = ? AND requester_id = ?", args: [missionId, userId] });
+        if (missionRes.rows.length === 0) {
+          return interaction.update({ content: "This mission has already been resolved.", embeds: [], components: [] });
+        }
+
+        await db.execute({ sql: "DELETE FROM active_missions WHERE id = ?", args: [missionId] });
+        interaction.client.pusher?.trigger("public-channel", "mission_update", { status: 'expired', requesterId: userId }).catch(() => {});
+
+        const embed = new EmbedBuilder()
+          .setTitle("⌛ Mission Expired")
+          .setDescription("Your mission has been marked as expired and removed.")
+          .setColor(0x95A5A6).setTimestamp();
+        return interaction.update({ embeds: [embed], components: [] });
 
       } else if (customId.startsWith("accept_req_") || customId.startsWith("host_choose_")) {
         const parts = customId.split("_");

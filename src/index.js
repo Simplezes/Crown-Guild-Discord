@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import db, { setupDatabase } from "./database.js";
 import { pusherServer } from "./pusher.js";
+import { refreshFlareEmbed } from "./events/interactionCreate.js";
 import PusherClient from "pusher-js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +31,66 @@ channel.bind("notification_created", () => {
 channel.bind("notification_updated", () => {
   console.log("Real-time notification updated, syncing now...");
   syncAcceptedToDiscord(true);
+});
+
+channel.bind("flare_updated", async (data) => {
+  if ((data.type === 'join' || data.type === 'leave') && data.flareId) {
+    refreshFlareEmbed(client, data.flareId);
+  } else if (data.type === 'started' && data.discordMessageId && data.discordChannelId) {
+    try {
+      const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import("discord.js");
+      const channel = await client.channels.fetch(data.discordChannelId).catch(() => null);
+      if (!channel) return;
+      const msg = await channel.messages.fetch(data.discordMessageId).catch(() => null);
+      if (!msg) return;
+
+      const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+      let displayName = data.monsterName.split(' ').map(capitalize).join(' ');
+      if (data.tempered) displayName = `Tempered ${displayName}`;
+      const typeLabel = data.crownType === 'small' ? "Small Crown" : "Large Crown";
+      const hunterList = data.hunters?.length > 0
+        ? data.hunters.map(h => `> 🗡️ **${h}**`).join("\n")
+        : "> *No hunters were in queue*";
+      const lobbyLine = data.sessionId ? `> **Lobby ID:** \`${data.sessionId}\`` : "";
+
+      const embed = new EmbedBuilder()
+        .setTitle(`⚔️ Quest Started: ${displayName}!`)
+        .setDescription([
+          `**${data.hostName}** has launched the hunt for ${data.monsterEmoji} **${displayName}**!`,
+          `> **Target:** ${typeLabel} (${data.strengthRating}★)`,
+          lobbyLine,
+          "",
+          `**Strike Team (${data.hunters?.length ?? 0}/4):**`,
+          hunterList,
+          "",
+          `Missions assigned. Use \`/hunt done\` when you get the crown!`,
+        ].filter(Boolean).join("\n"))
+        .setColor(0x2ECC71)
+        .setTimestamp();
+
+      const doneRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("quest_started_web").setLabel("⚔️ Quest Started!").setStyle(ButtonStyle.Success).setDisabled(true)
+      );
+
+      await msg.edit({ embeds: [embed], components: [doneRow], attachments: [] }).catch(() => {});
+    } catch (e) {
+      console.error("Error updating Discord embed on web start:", e);
+    }
+  } else if (data.type === 'close' && data.discordMessageId && data.discordChannelId) {
+    try {
+      const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import("discord.js");
+      const ch = await client.channels.fetch(data.discordChannelId).catch(() => null);
+      if (!ch) return;
+      const msg = await ch.messages.fetch(data.discordMessageId).catch(() => null);
+      if (!msg) return;
+      const disabledRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("closed_web").setLabel("Flare Closed").setStyle(ButtonStyle.Danger).setDisabled(true)
+      );
+      await msg.edit({ components: [disabledRow], attachments: [] }).catch(() => {});
+    } catch (e) {
+      console.error("Error updating Discord embed on web close:", e);
+    }
+  }
 });
 
 client.commands = new Collection();
@@ -260,12 +321,106 @@ async function runSyncLoop() {
   setTimeout(runSyncLoop, 30000);
 }
 
+async function checkExpiredMissions() {
+  try {
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import("discord.js");
+
+    const res = await db.execute({
+      sql: `SELECT am.*, u.username as requester_name, u.receive_dms,
+                   u_host.username as host_name, u_host.receive_dms as host_dms,
+                   mon.name as monster_name, mon.emoji
+            FROM active_missions am
+            JOIN users u ON am.requester_id = u.id
+            JOIN users u_host ON am.host_id = u_host.id
+            JOIN monsters mon ON am.monster_id = mon.id
+            WHERE am.expiry_notified = 0
+            AND am.created_at <= datetime('now', '-50 minutes')`
+    });
+
+    if (res.rows.length === 0) return;
+
+    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+    // Mark all as notified before sending DMs
+    for (const mission of res.rows) {
+      await db.execute({ sql: "UPDATE active_missions SET expiry_notified = 1 WHERE id = ?", args: [mission.id] });
+    }
+
+    // DM each hunter
+    for (const mission of res.rows) {
+      if (mission.receive_dms === 0) continue;
+
+      let displayName = mission.monster_name.split(' ').map(capitalize).join(' ');
+      if (mission.tempered) displayName = `Tempered ${displayName}`;
+      const typeLabel = mission.type === 'small' ? "Small Crown" : "Large Crown";
+
+      const embed = new EmbedBuilder()
+        .setTitle("⏱️ Quest Timer Expired")
+        .setDescription([
+          `Your quest timer has expired for ${mission.emoji || "🐉"} **${displayName}** (${typeLabel}).`,
+          `> **Host:** ${mission.host_name}`,
+          "",
+          `Did you complete the hunt and get the crown?`
+        ].join("\n"))
+        .setColor(0xE67E22)
+        .setTimestamp();
+
+      const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`quest_timeout_yes_${mission.id}`)
+          .setLabel("✅ Yes, got the Crown!")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`quest_timeout_no_${mission.id}`)
+          .setLabel("❌ No, didn't complete")
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      const user = await client.users.fetch(mission.requester_id).catch(() => null);
+      if (user) await user.send({ embeds: [embed], components: [buttons] }).catch(() => {});
+    }
+
+    // For group missions, also DM the host (once per group)
+    const notifiedHosts = new Set();
+    for (const mission of res.rows) {
+      if (!mission.group_id || notifiedHosts.has(mission.host_id)) continue;
+      notifiedHosts.add(mission.host_id);
+      if (mission.host_dms === 0) continue;
+
+      let displayName = mission.monster_name.split(' ').map(capitalize).join(' ');
+      if (mission.tempered) displayName = `Tempered ${displayName}`;
+      const typeLabel = mission.type === 'small' ? "Small Crown" : "Large Crown";
+
+      const embed = new EmbedBuilder()
+        .setTitle("⏱️ Group Quest Timer Expired")
+        .setDescription([
+          `Your hosted group quest for ${mission.emoji || "🐉"} **${displayName}** (${typeLabel}) has expired.`,
+          "",
+          `Hunters have been prompted to confirm if they completed the hunt.`
+        ].join("\n"))
+        .setColor(0xE67E22)
+        .setTimestamp();
+
+      const host = await client.users.fetch(mission.host_id).catch(() => null);
+      if (host) await host.send({ embeds: [embed] }).catch(() => {});
+    }
+  } catch (err) {
+    console.error("Error checking expired missions:", err);
+  }
+}
+
+async function runExpireLoop() {
+  await checkExpiredMissions();
+  setTimeout(runExpireLoop, 5 * 60 * 1000);
+}
+
 async function start() {
   try {
     await setupDatabase();
     await client.login(process.env.DISCORD_TOKEN);
     runPollLoop();
     runSyncLoop();
+    runExpireLoop();
     console.log("Bot started successfully with Pusher.");
   } catch (error) {
     console.error("Failed to start bot:", error);

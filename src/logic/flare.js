@@ -25,7 +25,7 @@ export function buildFlareEmbed({ displayName, monsterEmoji, typeEmoji, typeLabe
       `[📡 View on Crown Guild Hub](${WEB_HUB_URL})`,
     ].join("\n"))
     .setColor(0xFF4500)
-    .setFooter({ text: "Flares expire after 10 minutes. Use Leave to remove yourself." })
+    .setFooter({ text: "Flares expire after 5 minutes. Use Leave to remove yourself." })
     .setTimestamp();
 }
 
@@ -39,6 +39,10 @@ export function buildFlareButtons(flareId) {
       .setCustomId(`leave_flare_${flareId}`)
       .setLabel("🚪 Leave Queue")
       .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`start_flare_${flareId}`)
+      .setLabel("⚔️ Start Quest")
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`close_flare_${flareId}`)
       .setLabel("❌ Close Flare")
@@ -116,7 +120,8 @@ export default {
       }
     }
 
-    const msg = await interaction.reply({ embeds: [embed], components: [row], files, fetchReply: true });
+    await interaction.reply({ embeds: [embed], components: [row], files });
+    const msg = await interaction.fetchReply();
 
     await db.execute({
       sql: "UPDATE active_flares SET discord_message_id = ?, discord_channel_id = ? WHERE id = ?",
