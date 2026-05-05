@@ -1,10 +1,8 @@
 export const E = {
-  // Crown Types
   smallCrown: "<:smallcrown:1500245360323465386>",
   largeCrown: "<:largecrown:1500245422210420829>",
   tempered: "🔥",
 
-  // UI Icons
   communication: "<:MHWildsCommunication_Menu_Icon:1500270158202015837>",
   completedObj: "<:MHWildsCompleted_Objective_Icon:1500270226049204244>",
   eventQuest: "<:MHWildsEvent_Quest_Icon:1500270212686024817>",
@@ -20,7 +18,6 @@ export const E = {
   settings: "<:MHWildsSettings_Icon:1500270259318296696>",
   squadCounter: "<:MHWildsSquad_Information_Counter:1500270115663511713>",
 
-  // Monsters
   ajarakan: "<:MHWildsAjarakan_Icon:1500236219626553344>",
   arkveld: "<:MHWildsArkveld_Icon:1500236240056877246>",
   balahara: "<:MHWildsBalahara_Icon:1500236252975468746>",

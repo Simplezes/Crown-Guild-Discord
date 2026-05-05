@@ -7,6 +7,7 @@ import db, { setupDatabase } from "./database.js";
 import { pusherServer } from "./pusher.js";
 import { refreshFlareEmbed } from "./events/interactionCreate.js";
 import PusherClient from "pusher-js";
+import { formatMonsterName } from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -166,10 +167,7 @@ async function pollWebNotifications() {
           if (row.host_dms !== 0) {
             const host = await client.users.fetch(row.host_id).catch(() => null);
             if (host) {
-              const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-              let targetName = row.monster_name.split(' ').map(capitalize).join(' ');
-              if (row.tempered) targetName = `Tempered ${targetName}`;
-
+              const targetName = formatMonsterName(row.monster_name, row.tempered);
               const typeLabel = row.crown_type === 'small' ? "Small Crown" : "Large Crown";
               const typeEmoji = row.crown_type === 'small' ? E.smallCrown : E.largeCrown;
 
@@ -187,7 +185,7 @@ async function pollWebNotifications() {
                   .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
                   .setLabel("View Profile")
-                  .setURL(`https://crownguild.vercel.app/profile/${row.user_id}`)
+                  .setURL(`${process.env.WEB_HUB_URL}/profile/${row.user_id}`)
                   .setStyle(ButtonStyle.Link)
               );
 
@@ -202,9 +200,7 @@ async function pollWebNotifications() {
           if (row.requester_dms !== 0) {
             const requester = await client.users.fetch(row.user_id).catch(() => null);
             if (requester) {
-              const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-              let targetName = row.monster_name.split(' ').map(capitalize).join(' ');
-              if (row.tempered) targetName = `Tempered ${targetName}`;
+              let targetName = formatMonsterName(row.monster_name, row.tempered);
               targetName = `${targetName} - ${row.strength_rating}★`;
               
               const typeLabel = row.crown_type === 'small' ? "Small Crown" : "Large Crown";
@@ -271,9 +267,7 @@ async function syncAcceptedToDiscord() {
         if (!msg) continue;
 
         if (row.status === 'accepted') {
-          const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-          let displayParts = row.monster_name.split(' ').map(capitalize).join(' ');
-          if (row.tempered === 1) displayParts = `Tempered ${displayParts}`;
+          let displayParts = formatMonsterName(row.monster_name, row.tempered === 1);
           displayParts = `${displayParts} - ${row.strength_rating}★`;
           const typeLabel = row.crown_type === 'small' ? "Small Crown" : "Large Crown";
 
@@ -339,19 +333,14 @@ async function checkExpiredMissions() {
 
     if (res.rows.length === 0) return;
 
-    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
-    // Mark all as notified before sending DMs
     for (const mission of res.rows) {
       await db.execute({ sql: "UPDATE active_missions SET expiry_notified = 1 WHERE id = ?", args: [mission.id] });
     }
 
-    // DM each hunter
     for (const mission of res.rows) {
       if (mission.receive_dms === 0) continue;
 
-      let displayName = mission.monster_name.split(' ').map(capitalize).join(' ');
-      if (mission.tempered) displayName = `Tempered ${displayName}`;
+      const displayName = formatMonsterName(mission.monster_name, mission.tempered);
       const typeLabel = mission.type === 'small' ? "Small Crown" : "Large Crown";
 
       const embed = new EmbedBuilder()
@@ -380,15 +369,13 @@ async function checkExpiredMissions() {
       if (user) await user.send({ embeds: [embed], components: [buttons] }).catch(() => {});
     }
 
-    // For group missions, also DM the host (once per group)
     const notifiedHosts = new Set();
     for (const mission of res.rows) {
       if (!mission.group_id || notifiedHosts.has(mission.host_id)) continue;
       notifiedHosts.add(mission.host_id);
       if (mission.host_dms === 0) continue;
 
-      let displayName = mission.monster_name.split(' ').map(capitalize).join(' ');
-      if (mission.tempered) displayName = `Tempered ${displayName}`;
+      const displayName = formatMonsterName(mission.monster_name, mission.tempered);
       const typeLabel = mission.type === 'small' ? "Small Crown" : "Large Crown";
 
       const embed = new EmbedBuilder()

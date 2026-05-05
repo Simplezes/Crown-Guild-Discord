@@ -1,6 +1,7 @@
 import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
+import { formatMonsterName } from "../utils.js";
 
 export default {
   async execute(interaction) {
@@ -25,11 +26,8 @@ export default {
       });
     }
 
-    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
     const flareLines = res.rows.map(row => {
-      let displayName = row.monster_name.split(' ').map(capitalize).join(' ');
-      if (row.tempered) displayName = `Tempered ${displayName}`;
+      const displayName = formatMonsterName(row.monster_name, row.tempered);
       
       const typeLabel = row.type === 'small' ? "Small" : "Large";
       const typeEmoji = row.type === 'small' ? E.smallCrown : E.largeCrown;

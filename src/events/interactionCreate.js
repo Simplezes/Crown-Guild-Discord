@@ -3,6 +3,7 @@ import db from "../database.js";
 import { E } from "../emojis.js";
 import { buildFlareEmbed, buildFlareButtons } from "../logic/flare.js";
 import { randomUUID } from "crypto";
+import { capitalize, formatMonsterName, deductInvestigationUse } from "../utils.js";
 
 export async function refreshFlareEmbed(client, flareId) {
   try {
@@ -24,9 +25,7 @@ export async function refreshFlareEmbed(client, flareId) {
       args: [flareId]
     });
 
-    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-    let displayName = flare.monster_name.split(' ').map(capitalize).join(' ');
-    if (flare.tempered) displayName = `Tempered ${displayName}`;
+    let displayName = formatMonsterName(flare.monster_name, flare.tempered);
     const typeLabel = flare.type === 'small' ? "Small Crown" : "Large Crown";
     const { E: Emojis } = await import("../emojis.js");
     const typeEmoji = flare.type === 'small' ? Emojis.smallCrown : Emojis.largeCrown;
@@ -116,7 +115,7 @@ export default {
 
         const { buildPage, PAGE_SIZE } = await import("../pagination.js");
         const { MessageFlags } = await import("discord.js");
-        const WEB_BASE_URL = "https://crownguild.vercel.app";
+        const WEB_BASE_URL = process.env.WEB_HUB_URL;
 
         let entries = [];
         let title = "";
@@ -145,7 +144,6 @@ export default {
             collection[keyName].emojis.push(`${crownEmoji}${questLabel}`);
           });
 
-          const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
           entries = Object.entries(collection).map(([name, data]) => {
             const displayName = name.split(" ").map(capitalize).join(" ");
             return `**${data.monsterEmoji} ${displayName}**\n> ${data.emojis.join("  •  ")}`;
@@ -186,9 +184,8 @@ export default {
             grouped[keyName][row.type].push(`<@${row.user_id}>`);
           });
 
-          const capitalize2 = (s) => s.charAt(0).toUpperCase() + s.slice(1);
           entries = Object.entries(grouped).map(([name, data]) => {
-            const displayParts = name.split(" ").map(capitalize2).join(" ");
+            const displayParts = name.split(" ").map(capitalize).join(" ");
             const smallLine = data.small.length > 0
               ? `> <:smallcrown:1500245360323465386> **${data.small.length}** hunter${data.small.length !== 1 ? "s" : ""}`
               : `> <:smallcrown:1500245360323465386> *None*`;
@@ -344,9 +341,7 @@ export default {
         await interaction.client.pusher.trigger("public-channel", "mission_update", {}).catch(() => { });
         await interaction.client.pusher.trigger("public-channel", "notification_updated", {}).catch(() => { });
 
-        const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-        let displayName = flare.monster_name.split(' ').map(capitalize).join(' ');
-        if (flare.tempered) displayName = `Tempered ${displayName}`;
+        const displayName = formatMonsterName(flare.monster_name, flare.tempered);
         const typeLabel = flare.type === 'small' ? "Small Crown" : "Large Crown";
         const hunterList = hunters.length > 0
           ? hunters.map(h => `> 🗡️ **${h.username}**`).join("\n")
@@ -392,9 +387,7 @@ export default {
         }
 
         const mission = missionRes.rows[0];
-        const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-        let displayName = mission.monster_name.split(' ').map(capitalize).join(' ');
-        if (mission.tempered) displayName = `Tempered ${displayName}`;
+        const displayName = formatMonsterName(mission.monster_name, mission.tempered);
         const typeLabel = mission.type === 'small' ? "Small Crown" : "Large Crown";
 
         if (mission.group_id) {
@@ -418,31 +411,8 @@ export default {
                 args: [m.host_id, m.requester_id, m.monster_id, m.type, m.tempered, m.strength_rating]
               });
             }
-            // Deduct investigation once for the host
             const fm = groupRes.rows[0];
-            const invRes = await db.execute({
-              sql: `SELECT c.id, c.investigation_id,
-                           COALESCE(inv.remaining_uses, c.remaining_uses) as remaining_uses,
-                           inv.id as inv_id
-                    FROM crowns c
-                    LEFT JOIN investigations inv ON c.investigation_id = inv.id
-                    WHERE c.user_id = ? AND c.monster_id = ? AND c.type = ? AND c.tempered = ? AND c.strength_rating = ?
-                    AND c.quest = 'Investigation Quests'
-                    ORDER BY remaining_uses ASC LIMIT 1`,
-              args: [fm.host_id, fm.monster_id, fm.type, fm.tempered, fm.strength_rating]
-            });
-            const hc = invRes.rows[0];
-            if (hc && hc.remaining_uses !== null) {
-              const newUses = hc.remaining_uses - 1;
-              if (newUses <= 0) {
-                await db.execute({ sql: "DELETE FROM crowns WHERE id = ?", args: [hc.id] });
-                if (hc.inv_id) await db.execute({ sql: "DELETE FROM investigations WHERE id = ?", args: [hc.inv_id] });
-              } else if (hc.inv_id) {
-                await db.execute({ sql: "UPDATE investigations SET remaining_uses = ? WHERE id = ?", args: [newUses, hc.inv_id] });
-              } else {
-                await db.execute({ sql: "UPDATE crowns SET remaining_uses = ? WHERE id = ?", args: [newUses, hc.id] });
-              }
-            }
+            await deductInvestigationUse(fm.host_id, fm.monster_id, fm.type, fm.tempered, fm.strength_rating);
             await db.execute({ sql: "DELETE FROM active_missions WHERE group_id = ?", args: [mission.group_id] });
             interaction.client.pusher?.trigger("public-channel", "mission_update", { status: 'completed', groupId: mission.group_id }).catch(() => {});
             interaction.client.pusher?.trigger("public-channel", "crown_update", {}).catch(() => {});
@@ -542,8 +512,7 @@ export default {
               args: [monsterId]
             });
             const mData = monsterResPrompt.rows[0];
-            const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-            const mName = mData.name.split(' ').map(capitalize).join(' ');
+            const mName = formatMonsterName(mData.name, false);
             const mEmoji = mData.emoji || "🐉";
             const typeEmoji = type === "small" ? E.smallCrown : E.largeCrown;
             const typeLabel = type === "small" ? "Small Crown" : "Large Crown";
@@ -648,9 +617,7 @@ export default {
           args: [monsterId]
         });
         const m = monsterRes.rows[0];
-        const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-        let displayParts = m.name.split(' ').map(capitalize).join(' ');
-        if (selectedCrown.tempered === 1) displayParts = `Tempered ${displayParts}`;
+        let displayParts = formatMonsterName(m.name, selectedCrown.tempered === 1);
         displayParts = `${displayParts} - ${selectedCrown.strength_rating}★`;
         const typeLabel = type === "small" ? "Small Crown" : "Large Crown";
 
@@ -774,66 +741,6 @@ export default {
           interaction.client.pusher.trigger("public-channel", "mission_update", {});
         }
 
-      } else if (customId.startsWith("join_flare_")) {
-        const flareId = parseInt(customId.replace("join_flare_", ""));
-        const userId = interaction.user.id;
-
-        const { MessageFlags, EmbedBuilder } = await import("discord.js");
-
-        const flareRes = await db.execute({
-          sql: `SELECT f.*, u.username as host_name, m.name as monster_name, m.emoji 
-                FROM active_flares f 
-                JOIN users u ON f.host_id = u.id 
-                JOIN monsters m ON f.monster_id = m.id 
-                WHERE f.id = ?`,
-          args: [flareId]
-        });
-
-        if (flareRes.rows.length === 0) {
-          return interaction.reply({ content: "This flare has expired or been removed.", flags: MessageFlags.Ephemeral });
-        }
-
-        const flare = flareRes.rows[0];
-        if (flare.host_id === userId) {
-          return interaction.reply({ content: "You cannot join your own flare queue!", flags: MessageFlags.Ephemeral });
-        }
-
-        try {
-          await db.execute({
-            sql: "INSERT INTO flare_queue (flare_id, user_id) VALUES (?, ?)",
-            args: [flareId, userId]
-          });
-        } catch (e) {
-          return interaction.reply({ content: "You are already in the queue for this flare!", flags: MessageFlags.Ephemeral });
-        }
-
-        const queueRes = await db.execute({
-          sql: "SELECT user_id FROM flare_queue WHERE flare_id = ? ORDER BY created_at ASC",
-          args: [flareId]
-        });
-
-        const queueList = queueRes.rows.map((r, i) => `${i + 1}. <@${r.user_id}>`).join("\n");
-
-        const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-        let displayName = flare.monster_name.split(' ').map(capitalize).join(' ');
-        if (flare.tempered) displayName = `Tempered ${displayName}`;
-        const typeLabel = flare.type === 'small' ? "Small Crown" : "Large Crown";
-        const typeEmoji = flare.type === 'small' ? (flare.type === 'small' ? E.smallCrown : E.largeCrown) : "👑";
-
-        const oldEmbed = interaction.message.embeds[0];
-        const embed = EmbedBuilder.from(oldEmbed)
-          .setDescription([
-            `**${flare.host_name}** is hosting a hunt for ${flare.emoji} **${displayName}**!`,
-            `> **Target:** ${typeEmoji} ${typeLabel} (${flare.strength_rating}★)`,
-            `> **Status:** Waiting for hunters...`,
-            "",
-            `**Queue:**`,
-            queueList,
-            "",
-            `Click the button below to join the queue! The host will see your interest.`,
-          ].join("\n"));
-
-        await interaction.update({ embeds: [embed] });
       } else if (customId.startsWith("cancel_delete_account_")) {
         const ownerId = customId.replace("cancel_delete_account_", "");
         if (interaction.user.id !== ownerId) {

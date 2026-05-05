@@ -5,6 +5,40 @@ import { E } from "./emojis.js";
 
 const MONSTERS_PATH = path.join(process.cwd(), "src/database/monsters.json");
 
+export function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function formatMonsterName(name, tempered) {
+  const titled = name.split(" ").map(capitalize).join(" ");
+  return tempered ? `Tempered ${titled}` : titled;
+}
+
+export async function deductInvestigationUse(hostId, monsterId, type, tempered, strengthRating) {
+  const invRes = await db.execute({
+    sql: `SELECT c.id, c.investigation_id,
+                 COALESCE(inv.remaining_uses, c.remaining_uses) as remaining_uses,
+                 inv.id as inv_id
+          FROM crowns c
+          LEFT JOIN investigations inv ON c.investigation_id = inv.id
+          WHERE c.user_id = ? AND c.monster_id = ? AND c.type = ? AND c.tempered = ? AND c.strength_rating = ?
+          AND c.quest = 'Investigation Quests'
+          ORDER BY remaining_uses ASC LIMIT 1`,
+    args: [hostId, monsterId, type, tempered, strengthRating],
+  });
+  const hc = invRes.rows[0];
+  if (!hc || hc.remaining_uses === null) return;
+  const newUses = hc.remaining_uses - 1;
+  if (newUses <= 0) {
+    await db.execute({ sql: "DELETE FROM crowns WHERE id = ?", args: [hc.id] });
+    if (hc.inv_id) await db.execute({ sql: "DELETE FROM investigations WHERE id = ?", args: [hc.inv_id] });
+  } else if (hc.inv_id) {
+    await db.execute({ sql: "UPDATE investigations SET remaining_uses = ? WHERE id = ?", args: [newUses, hc.inv_id] });
+  } else {
+    await db.execute({ sql: "UPDATE crowns SET remaining_uses = ? WHERE id = ?", args: [newUses, hc.id] });
+  }
+}
+
 export function getMonstersFromJson() {
   try {
     const data = JSON.parse(fs.readFileSync(MONSTERS_PATH, "utf8"));

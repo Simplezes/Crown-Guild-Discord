@@ -122,7 +122,6 @@ export async function setupDatabase() {
     )`
   ], "write");
 
-  // Additive migrations — safe to run repeatedly
   await db.execute(`ALTER TABLE active_missions ADD COLUMN group_id TEXT`).catch(() => {});
   await db.execute(`ALTER TABLE active_missions ADD COLUMN hunter_confirmed INTEGER DEFAULT 0`).catch(() => {});
   await db.execute(`ALTER TABLE active_missions ADD COLUMN expiry_notified INTEGER DEFAULT 0`).catch(() => {});

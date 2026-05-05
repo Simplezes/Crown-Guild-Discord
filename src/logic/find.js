@@ -1,10 +1,10 @@
 import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
-import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
+import { handleMonsterAutocomplete, resolveMonsterName, capitalize, formatMonsterName } from "../utils.js";
 import { buildPage } from "../pagination.js";
 import { E } from "../emojis.js";
 
-const WEB_BASE_URL = "https://crownguild.vercel.app";
+const WEB_BASE_URL = process.env.WEB_HUB_URL;
 
 export default {
   async autocomplete(interaction) {
@@ -31,7 +31,6 @@ export default {
         grouped[keyName][row.type].push(`<@${row.user_id}>`);
       });
 
-      const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
       const entries = Object.entries(grouped).map(([name, data]) => {
         const displayParts = name.split(" ").map(capitalize).join(" ");
         const smallLine = data.small.length > 0
@@ -76,8 +75,7 @@ export default {
     const smallHolders = res.rows.filter(r => r.type === "small");
     const largeHolders = res.rows.filter(r => r.type === "large");
 
-    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-    const mName = monster.name.split(' ').map(capitalize).join(' ');
+    const mName = formatMonsterName(monster.name, false);
 
     const formatHolders = (holders) => {
       if (holders.length === 0) return "*None Recorded*";

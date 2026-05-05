@@ -1,9 +1,9 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from "discord.js";
 import db from "../database.js";
-import { handleMyCrownedMonsterAutocomplete, resolveMonsterName } from "../utils.js";
+import { handleMyCrownedMonsterAutocomplete, resolveMonsterName, capitalize, formatMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
 
-const WEB_HUB_URL = process.env.WEB_HUB_URL || "https://crownguild.vercel.app";
+const WEB_HUB_URL = process.env.WEB_HUB_URL;
 
 export function buildFlareEmbed({ displayName, monsterEmoji, typeEmoji, typeLabel, strengthRating, hostUsername, sessionId, members = [] }) {
   const memberLines = members.length > 0
@@ -93,9 +93,7 @@ export default {
     });
     const flareId = Number(flareRes.lastInsertRowid);
 
-    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-    let displayName = monster.name.split(' ').map(capitalize).join(' ');
-    if (bestCrown.tempered) displayName = `Tempered ${displayName}`;
+    const displayName = formatMonsterName(monster.name, bestCrown.tempered);
     const typeLabel = bestCrown.type === 'small' ? "Small Crown" : "Large Crown";
     const typeEmoji = bestCrown.type === 'small' ? E.smallCrown : E.largeCrown;
 

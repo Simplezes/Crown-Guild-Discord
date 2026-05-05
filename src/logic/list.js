@@ -2,8 +2,9 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
 import { buildPage } from "../pagination.js";
+import { capitalize } from "../utils.js";
 
-const WEB_BASE_URL = "https://crownguild.vercel.app";
+const WEB_BASE_URL = process.env.WEB_HUB_URL;
 
 export default {
   async execute(interaction) {
@@ -39,7 +40,6 @@ export default {
       collection[keyName].emojis.push(`${crownEmoji} \`${typeLabel}\`${questLabel}`);
     });
 
-    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
     const entries = Object.entries(collection).map(([name, data]) => {
       const displayName = name.split(" ").map(capitalize).join(" ");
       return `**${data.monsterEmoji} ${displayName}**\n> ${data.emojis.join("  •  ")}`;

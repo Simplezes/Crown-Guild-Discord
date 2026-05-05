@@ -1,10 +1,10 @@
 import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
-import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
+import { handleMonsterAutocomplete, resolveMonsterName, capitalize, formatMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
 import crypto from "crypto";
 
-const WEB_BASE_URL = "https://crownguild.vercel.app";
+const WEB_BASE_URL = process.env.WEB_HUB_URL;
 
 export default {
   async autocomplete(interaction) {
@@ -39,8 +39,7 @@ export default {
     }
 
     const monsterId = monster.id;
-    let displayName = monster.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    if (tempered) displayName = `Tempered ${displayName}`;
+    let displayName = formatMonsterName(monster.name, tempered);
     const monsterEmoji = monster.emoji || "🐉";
 
     let investigationId = null;
