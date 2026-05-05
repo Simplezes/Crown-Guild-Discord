@@ -20,12 +20,22 @@ The Discord half of Crown Guild. Handles slash commands for logging crowns, find
 
 | Command | Description |
 |---|---|
-| `/add` | Add a crown (Small, Large, or Both) |
-| `/remove` | Remove a crown from your collection |
-| `/list` | View your crown collection |
-| `/find` | Search for hunters who have a specific crown |
-| `/profile` | View your crown profile |
-| `/settings` | Configure your profile preferences |
+| `/crown add` | Log a new crown you've earned (Small, Large, or Both) |
+| `/crown remove` | Delete a specific crown entry |
+| `/crown list` | View your crown collection (or another hunter's) |
+| `/crown reset` | Clear your entire crown collection |
+| `/hunt flare` | Broadcast a hunt you are hosting (SOS Flare) |
+| `/hunt radar` | Scan for active SOS flares and crown hunts |
+| `/hunt find` | Search the global registry for specific crown holders |
+| `/hunt match` | Find mutual matches — hunters who need what you have |
+| `/hunt done` | Mark your active hunt as completed |
+| `/wishlist add` | Add a crown you are looking for |
+| `/wishlist remove` | Remove a crown from your wishlist |
+| `/wishlist view` | View your current wishlist |
+| `/profile view` | View your Hunter Card and stats |
+| `/profile settings` | Configure Lobby ID, Password, status, and DM preferences |
+| `/monster info` | View weaknesses, elements, and lore for a monster |
+| `/help` | View the Crown Guild command guide |
 
 ---
 
