@@ -218,7 +218,7 @@ export default {
         }
         if (flareRes.rows[0].host_id === userId) {
           const { MessageFlags } = await import("discord.js");
-          return interaction.reply({ content: "You are the host — you can't join your own flare!", flags: MessageFlags.Ephemeral });
+          return interaction.reply({ content: "You are the host - you can't join your own flare!", flags: MessageFlags.Ephemeral });
         }
 
         const queueCountRes = await db.execute({ sql: "SELECT COUNT(*) as count FROM active_flare_queue WHERE flare_id = ?", args: [flareId] });

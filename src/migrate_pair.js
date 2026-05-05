@@ -6,7 +6,7 @@ async function run() {
     console.log("✅ Added pair_id column to crowns table.");
   } catch (err) {
     if (err.message?.includes("duplicate column name")) {
-      console.log("ℹ️  pair_id column already exists — skipping.");
+      console.log("ℹ️  pair_id column already exists - skipping.");
     } else {
       throw err;
     }
