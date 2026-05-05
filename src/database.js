@@ -17,7 +17,8 @@ export async function setupDatabase() {
       lobby_id TEXT,
       quest_password TEXT,
       status_message TEXT,
-      receive_dms INTEGER DEFAULT 1
+      receive_dms INTEGER DEFAULT 1,
+      main_crown_server_id TEXT
     )`,
     `CREATE TABLE IF NOT EXISTS active_missions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
