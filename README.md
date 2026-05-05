@@ -1,5 +1,5 @@
 ﻿<p align="center">
-  <img src="../web/public/icon.png" width="96" alt="Crown Guild" />
+  <img src="icon.png" width="96" alt="Crown Guild" />
 </p>
 
 <h1 align="center">Crown Guild Bot</h1>
