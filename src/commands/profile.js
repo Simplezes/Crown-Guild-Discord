@@ -32,7 +32,7 @@ export default {
         .addStringOption((option) =>
           option
             .setName("password")
-            .setDescription("Your Default Quest Password")
+            .setDescription("Your Default Quest Password (exactly 4 digits)")
             .setRequired(false)
         )
         .addStringOption((option) =>
