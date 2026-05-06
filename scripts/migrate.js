@@ -87,6 +87,16 @@ async function migrate() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (host_id) REFERENCES users(id),
+      FOREIGN KEY (monster_id) REFERENCES monsters(id),
+      FOREIGN KEY (crown_id) REFERENCES crowns(id) ON DELETE SET NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS hunter_collection (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT,
+      monster_id INTEGER,
+      type TEXT CHECK(type IN ('small', 'large', 'both')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (monster_id) REFERENCES monsters(id)
     )`
   ];

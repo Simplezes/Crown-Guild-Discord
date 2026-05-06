@@ -120,12 +120,21 @@ export async function setupDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (flare_id, user_id),
       FOREIGN KEY (flare_id) REFERENCES active_flares(id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS hunter_collection (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT,
+      monster_id INTEGER,
+      type TEXT CHECK(type IN ('small', 'large', 'both')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (monster_id) REFERENCES monsters(id)
     )`
   ], "write");
 
-  await db.execute(`ALTER TABLE active_missions ADD COLUMN group_id TEXT`).catch(() => {});
-  await db.execute(`ALTER TABLE active_missions ADD COLUMN hunter_confirmed INTEGER DEFAULT 0`).catch(() => {});
-  await db.execute(`ALTER TABLE active_missions ADD COLUMN expiry_notified INTEGER DEFAULT 0`).catch(() => {});
+  await db.execute(`ALTER TABLE active_missions ADD COLUMN group_id TEXT`).catch(() => { });
+  await db.execute(`ALTER TABLE active_missions ADD COLUMN hunter_confirmed INTEGER DEFAULT 0`).catch(() => { });
+  await db.execute(`ALTER TABLE active_missions ADD COLUMN expiry_notified INTEGER DEFAULT 0`).catch(() => { });
 
   console.log("Database tables initialized.");
 }
