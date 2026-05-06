@@ -1,20 +1,23 @@
-import { SlashCommandBuilder } from "discord.js";
+import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import flareLogic from "../logic/flare.js";
 import radarLogic from "../logic/radar.js";
 import findLogic from "../logic/find.js";
 import matchLogic from "../logic/match.js";
 import completeLogic from "../logic/complete.js";
+import { SOS_DISABLED_MESSAGE, SOS_FEATURE_ENABLED } from "../featureFlags.js";
 
-export default {
-  data: new SlashCommandBuilder()
-    .setName("hunt")
-    .setDescription("Multiplayer crown hunting activities")
-    .setIntegrationTypes(0, 1)
-    .setContexts(0, 1, 2)
+const huntCommand = new SlashCommandBuilder()
+  .setName("hunt")
+  .setDescription("Multiplayer crown hunting activities")
+  .setIntegrationTypes(0, 1)
+  .setContexts(0, 1, 2);
+
+if (SOS_FEATURE_ENABLED) {
+  huntCommand
     .addSubcommand((sub) =>
       sub
         .setName("flare")
-        .setDescription("🔥 Fire an SOS Flare to host a crown hunt!")
+        .setDescription("Fire an SOS Flare to host a crown hunt")
         .addStringOption((option) =>
           option
             .setName("monster")
@@ -32,8 +35,12 @@ export default {
     .addSubcommand((sub) =>
       sub
         .setName("radar")
-        .setDescription("📡 Scan for active SOS Flares and crown hunts")
-    )
+        .setDescription("Scan for active SOS flares and crown hunts")
+    );
+}
+
+export default {
+  data: huntCommand
     .addSubcommand((sub) =>
       sub
         .setName("find")
@@ -75,6 +82,9 @@ export default {
     ),
   async autocomplete(interaction) {
     const sub = interaction.options.getSubcommand();
+    if (!SOS_FEATURE_ENABLED && sub === "flare") {
+      return interaction.respond([]);
+    }
     if (sub === "flare") await flareLogic.autocomplete(interaction);
     if (sub === "find") await findLogic.autocomplete(interaction);
     if (sub === "match") {
@@ -86,6 +96,9 @@ export default {
   },
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+    if (!SOS_FEATURE_ENABLED && (sub === "flare" || sub === "radar")) {
+      return interaction.reply({ content: SOS_DISABLED_MESSAGE, flags: MessageFlags.Ephemeral });
+    }
     if (sub === "flare") return flareLogic.execute(interaction);
     if (sub === "radar") return radarLogic.execute(interaction);
     if (sub === "find") return findLogic.execute(interaction);

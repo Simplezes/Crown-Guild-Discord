@@ -5,6 +5,7 @@ import { buildFlareEmbed, buildFlareButtons } from "../logic/flare.js";
 import addLogic from "../logic/add.js";
 import { randomUUID } from "crypto";
 import { capitalize, formatMonsterName, deductInvestigationUse } from "../utils.js";
+import { SOS_DISABLED_MESSAGE, SOS_FEATURE_ENABLED } from "../featureFlags.js";
 
 export async function refreshFlareEmbed(client, flareId) {
   try {
@@ -114,6 +115,11 @@ export default {
       }
     } else if (interaction.isButton()) {
       const customId = interaction.customId;
+
+      if (!SOS_FEATURE_ENABLED && (customId.startsWith("join_flare_") || customId.startsWith("leave_flare_") || customId.startsWith("close_flare_") || customId.startsWith("start_flare_"))) {
+        const { MessageFlags } = await import("discord.js");
+        return interaction.reply({ content: SOS_DISABLED_MESSAGE, flags: MessageFlags.Ephemeral });
+      }
 
       if (customId.startsWith("page_prev_") || customId.startsWith("page_next_")) {
         const parts = customId.split("_");
