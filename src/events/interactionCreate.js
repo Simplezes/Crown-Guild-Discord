@@ -2,6 +2,7 @@ import { Events } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
 import { buildFlareEmbed, buildFlareButtons } from "../logic/flare.js";
+import addLogic from "../logic/add.js";
 import { randomUUID } from "crypto";
 import { capitalize, formatMonsterName, deductInvestigationUse } from "../utils.js";
 
@@ -68,6 +69,16 @@ export default {
   name: Events.InteractionCreate,
   async execute(interaction) {
     await syncUser(interaction);
+
+    if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith("crownadd:")) {
+      const handled = await addLogic.handleComponent(interaction);
+      if (handled) return;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("crownaddmodal:")) {
+      const handled = await addLogic.handleModalSubmit(interaction);
+      if (handled) return;
+    }
 
     if (interaction.isChatInputCommand()) {
       const command = interaction.client.commands.get(interaction.commandName);
