@@ -115,7 +115,6 @@ async function migrate() {
     { table: 'users', column: 'quest_password', type: 'TEXT' },
     { table: 'users', column: 'status_message', type: 'TEXT' },
     { table: 'users', column: 'receive_dms', type: 'INTEGER DEFAULT 1' },
-    { table: 'users', column: 'main_crown_server_id', type: 'TEXT' },
     { table: 'users', column: 'shared_crowns', type: 'INTEGER DEFAULT 0' },
     { table: 'users', column: 'missions_completed', type: 'INTEGER DEFAULT 0' },
     { table: 'crowns', column: 'tempered', type: 'INTEGER DEFAULT 0' },
