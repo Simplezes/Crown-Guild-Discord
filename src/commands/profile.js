@@ -21,6 +21,27 @@ export default {
     )
     .addSubcommand((sub) =>
       sub
+        .setName("share")
+        .setDescription("Share a profile in Discord-ready text")
+        .addUserOption((option) =>
+          option
+            .setName("user")
+            .setDescription("The user whose profile share you want")
+            .setRequired(false)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("format")
+            .setDescription("Share format")
+            .setRequired(false)
+            .addChoices(
+              { name: "Compact", value: "compact" },
+              { name: "Text", value: "text" }
+            )
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName("settings")
         .setDescription("Configure your guild card settings (Lobby ID, Password)")
         .addStringOption((option) =>
@@ -51,6 +72,7 @@ export default {
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
     if (sub === "view") return profileLogic.execute(interaction);
+    if (sub === "share") return profileLogic.executeShare(interaction);
     if (sub === "settings") return settingsLogic.execute(interaction);
   },
 };

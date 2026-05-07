@@ -49,6 +49,7 @@ const GROUPS = {
       {
         name: "Actions", value: [
           "> `view` - See your Hunter Card and stats",
+          "> `share` - Post a Discord-ready profile share",
           "> `settings` - Configure Lobby ID, Password, and DMs",
         ].join("\n"), inline: false
       }

@@ -121,6 +121,42 @@ export default {
         return interaction.reply({ content: SOS_DISABLED_MESSAGE, flags: MessageFlags.Ephemeral });
       }
 
+      if (customId.startsWith("profileview_")) {
+        const { buildProfileMessage } = await import("../logic/profile.js");
+
+        if (customId.startsWith("profileview_section_")) {
+          const [, , section, userId] = customId.split("_");
+          const payload = await buildProfileMessage(userId, interaction.client, section, 0);
+
+          if (!payload) {
+            return interaction.update({
+              content: "Hunter not found in the registry.",
+              embeds: [],
+              components: [],
+            });
+          }
+
+          return interaction.update(payload);
+        }
+
+        if (customId.startsWith("profileview_prev_") || customId.startsWith("profileview_next_")) {
+          const [, direction, section, currentPageRaw, userId] = customId.split("_");
+          const currentPage = parseInt(currentPageRaw, 10);
+          const nextPage = direction === "prev" ? currentPage - 1 : currentPage + 1;
+          const payload = await buildProfileMessage(userId, interaction.client, section, nextPage);
+
+          if (!payload) {
+            return interaction.update({
+              content: "Hunter not found in the registry.",
+              embeds: [],
+              components: [],
+            });
+          }
+
+          return interaction.update(payload);
+        }
+      }
+
       if (customId.startsWith("page_prev_") || customId.startsWith("page_next_")) {
         const parts = customId.split("_");
         const direction = parts[1];
