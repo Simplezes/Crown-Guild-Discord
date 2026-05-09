@@ -11,7 +11,29 @@ const huntCommand = new SlashCommandBuilder()
   .setName("hunt")
   .setDescription("Multiplayer crown hunting activities")
   .setIntegrationTypes(0, 1)
-  .setContexts(0, 1, 2);
+  .setContexts(0, 1, 2)
+  .addSubcommand((sub) =>
+    sub
+      .setName("match")
+      .setDescription("Match with hunters who need what you have, or have what you need")
+      .addStringOption((option) =>
+        option
+          .setName("monster")
+          .setDescription("The monster to match for (Optional)")
+          .setRequired(false)
+          .setAutocomplete(true)
+      )
+      .addStringOption((option) =>
+        option
+          .setName("role")
+          .setDescription("Are you looking for a host or looking for hunters to join you?")
+          .addChoices(
+            { name: "I am Seeking (Find me a Host)", value: "seeker" },
+            { name: "I am Hosting (Find me Hunters)", value: "host" }
+          )
+          .setRequired(false)
+      )
+  );
 
 if (SOS_FEATURE_ENABLED) {
   huntCommand
@@ -52,42 +74,20 @@ if (SOS_FEATURE_ENABLED) {
     )
     .addSubcommand((sub) =>
       sub
-        .setName("match")
-        .setDescription("Match with hunters who need what you have, or have what you need")
-        .addStringOption((option) =>
-          option
-            .setName("monster")
-            .setDescription("The monster to match for (Optional)")
-            .setRequired(false)
-            .setAutocomplete(true)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("role")
-            .setDescription("Are you looking for a host or looking for hunters to join you?")
-            .addChoices(
-              { name: "I am Seeking (Find me a Host)", value: "seeker" },
-              { name: "I am Hosting (Find me Hunters)", value: "host" }
-            )
-            .setRequired(false)
-        )
-    )
-    .addSubcommand((sub) =>
-      sub
         .setName("done")
         .setDescription("Mark your current active hunt as completed")
     );
 }
 
-const huntCommandData = SOS_FEATURE_ENABLED ? huntCommand : null;
+const huntCommandData = huntCommand;
 
 export default {
   data: huntCommandData,
   async autocomplete(interaction) {
-    if (!SOS_FEATURE_ENABLED) {
+    const sub = interaction.options.getSubcommand();
+    if (!SOS_FEATURE_ENABLED && sub !== "match") {
       return interaction.respond([]);
     }
-    const sub = interaction.options.getSubcommand();
     if (sub === "flare") await flareLogic.autocomplete(interaction);
     if (sub === "find") await findLogic.autocomplete(interaction);
     if (sub === "match") {
@@ -99,7 +99,7 @@ export default {
   },
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
-    if (!SOS_FEATURE_ENABLED) {
+    if (!SOS_FEATURE_ENABLED && sub !== "match") {
       return interaction.reply(
         ephemeralStatus({
           title: "Hunt System Offline",

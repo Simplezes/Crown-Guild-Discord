@@ -2,6 +2,19 @@ import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from "discord.js";
 import path from "path";
 import fs from "fs";
 import { E } from "../emojis.js";
+import { SOS_FEATURE_ENABLED } from "../featureFlags.js";
+
+const huntActions = SOS_FEATURE_ENABLED
+  ? [
+    "> `flare` - Broadcast a hunt you are hosting",
+    "> `radar` - Scan for active SOS flares",
+    "> `find` - Search the global registry for specific holders",
+    "> `match` - Find mutual matches (those who need what you have)",
+    "> `done` - Mark your active hunt as completed",
+  ]
+  : [
+    "> `match` - Find hunters who have crowns you need",
+  ];
 
 const GROUPS = {
   crown: {
@@ -21,13 +34,7 @@ const GROUPS = {
     title: `${E.hunt}  /hunt - Multiplayer Activities`,
     fields: [
       {
-        name: "Actions", value: [
-          "> `flare` - Broadcast a hunt you are hosting",
-          "> `radar` - Scan for active SOS flares",
-          "> `find` - Search the global registry for specific holders",
-          "> `match` - Find mutual matches (those who need what you have)",
-          "> `done` - Mark your active hunt as completed",
-        ].join("\n"), inline: false
+        name: "Actions", value: huntActions.join("\n"), inline: false
       }
     ]
   },
