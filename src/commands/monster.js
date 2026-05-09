@@ -4,7 +4,7 @@ import monsterLogic from "../logic/monster.js";
 export default {
   data: new SlashCommandBuilder()
     .setName("monster")
-    .setDescription("📖 Get detailed info about a specific monster")
+    .setDescription("Get detailed info about a specific monster")
     .setIntegrationTypes(0, 1)
     .setContexts(0, 1, 2)
     .addSubcommand((sub) =>

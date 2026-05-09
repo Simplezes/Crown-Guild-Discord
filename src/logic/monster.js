@@ -2,6 +2,8 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import path from "path";
 import fs from "fs";
+import { ephemeralStatus } from "../responseEmbeds.js";
+import { E } from "../emojis.js";
 
 export default {
   async autocomplete(interaction) {
@@ -12,24 +14,33 @@ export default {
 
     const monster = await resolveMonsterName(monsterName);
     if (!monster) {
-      return interaction.reply({
-        content: `Monster **${monsterName}** not found.`,
-        flags: MessageFlags.Ephemeral,
-      });
+      return interaction.reply(
+        ephemeralStatus({
+          title: "Monster Not Found",
+          description: `No monster matched **${monsterName}**. Try selecting one from autocomplete.`,
+          tone: "warning",
+        })
+      );
     }
 
     const monsters = JSON.parse(fs.readFileSync(path.join(process.cwd(), "src/database/monsters.json"), "utf8")).monsters;
     const monsterData = monsters.find(m => m.name.toLowerCase() === monster.name.toLowerCase());
 
     if (!monsterData) {
-      return interaction.reply({ content: "Lore not found for this monster.", flags: MessageFlags.Ephemeral });
+      return interaction.reply(
+        ephemeralStatus({
+          title: "Lore Unavailable",
+          description: "Lore data for this monster is not available yet.",
+          tone: "neutral",
+        })
+      );
     }
 
     const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
     const mName = monster.name.split(' ').map(capitalize).join(' ');
 
     const embed = new EmbedBuilder()
-      .setTitle(`${monster.emoji || "🐉"} ${mName}`)
+      .setTitle(`${monster.emoji || E.hunt} ${mName}`)
       .setDescription(monsterData.description || "No description available.")
       .setColor(0xC4982A)
       .addFields(
@@ -40,7 +51,7 @@ export default {
 
     if (monsterData.weaknesses) {
       const weakStr = Object.entries(monsterData.weaknesses)
-        .map(([el, star]) => `${el}: ${"⭐".repeat(star)}`)
+        .map(([el, star]) => `${el}: ${star}/5`)
         .join("\n");
       embed.addFields({ name: "Weaknesses", value: weakStr || "Unknown", inline: false });
     }

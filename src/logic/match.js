@@ -134,7 +134,7 @@ export default {
 
   renderMatches(interaction, matches, title) {
     const matchLines = matches.slice(0, 10).map((m) => {
-      const mutualLabel = m.is_mutual ? ` ✨ **Mutual!**` : "";
+      const mutualLabel = m.is_mutual ? ` ${E.linkParty} **Mutual!**` : "";
       const typeEmoji = m.type === 'small' ? E.smallCrown : E.largeCrown;
       const tempLabel = m.tempered ? `${E.tempered} ` : "";
       const rating = m.strength_rating > 0 ? ` (${m.strength_rating}★)` : "";
@@ -142,7 +142,7 @@ export default {
     });
 
     const embed = new EmbedBuilder()
-      .setTitle(`🔍 ${title}`)
+      .setTitle(`${E.communication} ${title}`)
       .setDescription([
         "Matches found within the Crown Guild database:",
         "",

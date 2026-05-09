@@ -6,6 +6,7 @@ import addLogic from "../logic/add.js";
 import { randomUUID } from "crypto";
 import { capitalize, formatMonsterName, deductInvestigationUse } from "../utils.js";
 import { SOS_DISABLED_MESSAGE, SOS_FEATURE_ENABLED } from "../featureFlags.js";
+import { ephemeralStatus } from "../responseEmbeds.js";
 
 export async function refreshFlareEmbed(client, flareId) {
   try {
@@ -93,11 +94,15 @@ export default {
         await command.execute(interaction);
       } catch (error) {
         console.error(error);
-        const { MessageFlags } = await import("discord.js");
+        const payload = ephemeralStatus({
+          title: "Command Failed",
+          description: "There was an error while executing this command.",
+          tone: "danger",
+        });
         if (interaction.replied || interaction.deferred) {
-          await interaction.followUp({ content: "There was an error while executing this command!", flags: MessageFlags.Ephemeral });
+          await interaction.followUp(payload);
         } else {
-          await interaction.reply({ content: "There was an error while executing this command!", flags: MessageFlags.Ephemeral });
+          await interaction.reply(payload);
         }
       }
     } else if (interaction.isAutocomplete()) {
@@ -115,10 +120,25 @@ export default {
       }
     } else if (interaction.isButton()) {
       const customId = interaction.customId;
+      const huntActionPrefixes = [
+        "join_flare_",
+        "leave_flare_",
+        "close_flare_",
+        "start_flare_",
+        "quest_timeout_yes_",
+        "quest_timeout_no_",
+        "accept_req_",
+        "host_choose_",
+      ];
 
-      if (!SOS_FEATURE_ENABLED && (customId.startsWith("join_flare_") || customId.startsWith("leave_flare_") || customId.startsWith("close_flare_") || customId.startsWith("start_flare_"))) {
-        const { MessageFlags } = await import("discord.js");
-        return interaction.reply({ content: SOS_DISABLED_MESSAGE, flags: MessageFlags.Ephemeral });
+      if (!SOS_FEATURE_ENABLED && huntActionPrefixes.some((prefix) => customId.startsWith(prefix))) {
+        return interaction.reply(
+          ephemeralStatus({
+            title: "Hunt System Offline",
+            description: SOS_DISABLED_MESSAGE,
+            tone: "warning",
+          })
+        );
       }
 
       if (customId.startsWith("profileview_")) {
@@ -191,7 +211,7 @@ export default {
           res.rows.forEach((row) => {
             let keyName = row.name;
             if (row.tempered) keyName = `Tempered ${row.name}`;
-            if (!collection[keyName]) collection[keyName] = { emojis: [], monsterEmoji: row.emoji || "🐉" };
+            if (!collection[keyName]) collection[keyName] = { emojis: [], monsterEmoji: row.emoji || E.hunt };
             const crownEmoji = row.type === "small" ? "<:smallcrown:1500245360323465386> `Small`" : "<:largecrown:1500245422210420829> `Large`";
             const questLabel = row.quest ? ` (${row.quest})` : "";
             collection[keyName].emojis.push(`${crownEmoji}${questLabel}`);
@@ -233,7 +253,7 @@ export default {
           res.rows.forEach((row) => {
             let keyName = row.name;
             if (row.tempered) keyName = `Tempered ${row.name}`;
-            if (!grouped[keyName]) grouped[keyName] = { small: [], large: [], emoji: row.emoji || "🐉" };
+            if (!grouped[keyName]) grouped[keyName] = { small: [], large: [], emoji: row.emoji || E.hunt };
             grouped[keyName][row.type].push(`<@${row.user_id}>`);
           });
 
@@ -266,29 +286,54 @@ export default {
 
         const flareRes = await db.execute({ sql: "SELECT id, host_id FROM active_flares WHERE id = ?", args: [flareId] });
         if (flareRes.rows.length === 0) {
-          const { MessageFlags } = await import("discord.js");
-          return interaction.reply({ content: "This SOS flare has expired or been closed.", flags: MessageFlags.Ephemeral });
+          return interaction.reply(
+            ephemeralStatus({
+              title: "Flare Unavailable",
+              description: "This SOS flare has expired or was closed.",
+              tone: "neutral",
+            })
+          );
         }
         if (flareRes.rows[0].host_id === userId) {
-          const { MessageFlags } = await import("discord.js");
-          return interaction.reply({ content: "You are the host - you can't join your own flare!", flags: MessageFlags.Ephemeral });
+          return interaction.reply(
+            ephemeralStatus({
+              title: "Action Blocked",
+              description: "You cannot join your own flare.",
+              tone: "warning",
+            })
+          );
         }
 
         const queueCountRes = await db.execute({ sql: "SELECT COUNT(*) as count FROM active_flare_queue WHERE flare_id = ?", args: [flareId] });
         if (Number(queueCountRes.rows[0].count) >= 4) {
-          const { MessageFlags } = await import("discord.js");
-          return interaction.reply({ content: "This party is already full! (4/4 hunters)", flags: MessageFlags.Ephemeral });
+          return interaction.reply(
+            ephemeralStatus({
+              title: "Party Full",
+              description: "This strike team is already full (4/4 hunters).",
+              tone: "warning",
+            })
+          );
         }
 
         try {
           await db.execute({ sql: "INSERT INTO active_flare_queue (flare_id, user_id) VALUES (?, ?)", args: [flareId, userId] });
           await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'join' }).catch(() => { });
           await refreshFlareEmbed(interaction.client, flareId);
-          const { MessageFlags } = await import("discord.js");
-          return interaction.reply({ content: "✅ Joined the strike team queue!", flags: MessageFlags.Ephemeral });
+          return interaction.reply(
+            ephemeralStatus({
+              title: "Queue Updated",
+              description: "You joined the strike team queue.",
+              tone: "success",
+            })
+          );
         } catch (e) {
-          const { MessageFlags } = await import("discord.js");
-          return interaction.reply({ content: "You are already in this queue.", flags: MessageFlags.Ephemeral });
+          return interaction.reply(
+            ephemeralStatus({
+              title: "Already Queued",
+              description: "You are already in this flare queue.",
+              tone: "neutral",
+            })
+          );
         }
 
       } else if (customId.startsWith("leave_flare_")) {
@@ -298,13 +343,25 @@ export default {
         const { MessageFlags } = await import("discord.js");
         const inQueue = await db.execute({ sql: "SELECT 1 FROM active_flare_queue WHERE flare_id = ? AND user_id = ?", args: [flareId, userId] });
         if (inQueue.rows.length === 0) {
-          return interaction.reply({ content: "You are not in this queue.", flags: MessageFlags.Ephemeral });
+          return interaction.reply(
+            ephemeralStatus({
+              title: "Not In Queue",
+              description: "You are not in this flare queue.",
+              tone: "neutral",
+            })
+          );
         }
 
         await db.execute({ sql: "DELETE FROM active_flare_queue WHERE flare_id = ? AND user_id = ?", args: [flareId, userId] });
         await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'leave', flareId }).catch(() => { });
         await refreshFlareEmbed(interaction.client, flareId);
-        return interaction.reply({ content: "🚪 You've left the queue.", flags: MessageFlags.Ephemeral });
+        return interaction.reply(
+          ephemeralStatus({
+            title: "Queue Updated",
+            description: "You left the strike team queue.",
+            tone: "info",
+          })
+        );
 
       } else if (customId.startsWith("close_flare_")) {
         const flareId = parseInt(customId.split("_")[2]);
@@ -397,12 +454,12 @@ export default {
         const displayName = formatMonsterName(flare.monster_name, flare.tempered);
         const typeLabel = flare.type === 'small' ? "Small Crown" : "Large Crown";
         const hunterList = hunters.length > 0
-          ? hunters.map(h => `> 🗡️ **${h.username}**`).join("\n")
+          ? hunters.map(h => `> ${E.questMembers} **${h.username}**`).join("\n")
           : "> *No hunters were in queue*";
         const lobbyLine = flare.lobby_id ? `> **Lobby ID:** \`${flare.lobby_id}\`` : "";
 
         const embed = new EmbedBuilder()
-          .setTitle(`⚔️ Quest Started: ${displayName}!`)
+          .setTitle(`${E.hunt} Quest Started: ${displayName}!`)
           .setDescription([
             `**${flare.host_name}** has launched the hunt for ${flare.emoji} **${displayName}**!`,
             `> **Target:** ${typeLabel} (${flare.strength_rating}★)`,
@@ -417,7 +474,7 @@ export default {
           .setTimestamp();
 
         const doneRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`quest_started_1`).setLabel("⚔️ Quest Started!").setStyle(ButtonStyle.Success).setDisabled(true)
+          new ButtonBuilder().setCustomId(`quest_started_1`).setLabel("Quest Started").setStyle(ButtonStyle.Success).setDisabled(true)
         );
         await interaction.update({ embeds: [embed], components: [doneRow] }).catch(() => { });
         return;
@@ -474,7 +531,7 @@ export default {
           }
 
           const embed = new EmbedBuilder()
-            .setTitle(allConfirmed ? "✅ Group Quest Complete!" : "✅ Crown Confirmed!")
+            .setTitle(allConfirmed ? `${E.notesCheckmark} Group Quest Complete!` : `${E.notesCheckmark} Crown Confirmed!`)
             .setDescription(allConfirmed
               ? `All hunters confirmed! Quest complete for **${displayName}**.`
               : `Your crown for **${displayName}** has been logged. Waiting for other hunters...`)
@@ -490,7 +547,7 @@ export default {
           interaction.client.pusher?.trigger("public-channel", "crown_update", {}).catch(() => {});
 
           const embed = new EmbedBuilder()
-            .setTitle("✅ Mission Complete!")
+            .setTitle(`${E.notesCheckmark} Mission Complete!`)
             .setDescription(`Crown confirmed for **${displayName}** (${typeLabel})!`)
             .setColor(0x2ECC71).setTimestamp();
           return interaction.update({ embeds: [embed], components: [] });
@@ -510,7 +567,7 @@ export default {
         interaction.client.pusher?.trigger("public-channel", "mission_update", { status: 'expired', requesterId: userId }).catch(() => {});
 
         const embed = new EmbedBuilder()
-          .setTitle("⌛ Mission Expired")
+          .setTitle("Mission Expired")
           .setDescription("Your mission has been marked as expired and removed.")
           .setColor(0x95A5A6).setTimestamp();
         return interaction.update({ embeds: [embed], components: [] });
@@ -566,7 +623,7 @@ export default {
             });
             const mData = monsterResPrompt.rows[0];
             const mName = formatMonsterName(mData.name, false);
-            const mEmoji = mData.emoji || "🐉";
+            const mEmoji = mData.emoji || E.hunt;
             const typeEmoji = type === "small" ? E.smallCrown : E.largeCrown;
             const typeLabel = type === "small" ? "Small Crown" : "Large Crown";
 
@@ -684,7 +741,7 @@ export default {
 
         const embed = new EmbedBuilder()
           .setTitle("<:MHWildsHunt_Icon:1500270140682404001> Mission Undergoing!")
-          .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${hostId}>\n**Requester:** <@${requesterId}>\n**Target:** ${m.emoji || "🐉"} **${displayParts}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/hunt done\`!`)
+          .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${hostId}>\n**Requester:** <@${requesterId}>\n**Target:** ${m.emoji || E.hunt} **${displayParts}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/hunt done\`!`)
           .setColor(0x3498DB);
 
         if (isChoose) {
@@ -750,7 +807,7 @@ export default {
 
         const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import("discord.js");
         const embed = new EmbedBuilder()
-          .setTitle("⚠️ Final Warning: Account Deletion")
+          .setTitle("Final Warning: Account Deletion")
           .setDescription("This will permanently delete your entire profile, including all collected crowns and mission history. **This cannot be undone.**\n\nAre you absolutely sure?")
           .setColor(0xED4245);
 

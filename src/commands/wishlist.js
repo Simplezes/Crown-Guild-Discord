@@ -4,7 +4,7 @@ import wishlistLogic from "../logic/wishlist.js";
 export default {
   data: new SlashCommandBuilder()
     .setName("wishlist")
-    .setDescription("📝 Manage the crowns you are looking for")
+    .setDescription("Manage the crowns you are looking for")
     .setIntegrationTypes(0, 1)
     .setContexts(0, 1, 2)
     .addSubcommand((sub) =>

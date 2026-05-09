@@ -3,6 +3,7 @@ import db from "../database.js";
 import { E } from "../emojis.js";
 import { buildPage } from "../pagination.js";
 import { capitalize } from "../utils.js";
+import { ephemeralStatus } from "../responseEmbeds.js";
 
 const WEB_BASE_URL = process.env.WEB_HUB_URL;
 
@@ -26,14 +27,20 @@ export default {
       const msg = targetUser.id === interaction.user.id 
         ? "Your collection is empty! Log your first crown with `/crown add`." 
         : "This hunter's collection is empty!";
-      return interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
+      return interaction.reply(
+        ephemeralStatus({
+          title: "No Crowns Logged",
+          description: msg,
+          tone: "neutral",
+        })
+      );
     }
 
     const collection = {};
     res.rows.forEach((row) => {
       let keyName = row.name;
       if (row.tempered) keyName = `Tempered ${row.name}`;
-      if (!collection[keyName]) collection[keyName] = { emojis: [], monsterEmoji: row.emoji || "🐉" };
+      if (!collection[keyName]) collection[keyName] = { emojis: [], monsterEmoji: row.emoji || E.hunt };
       const crownEmoji = row.type === "small" ? E.smallCrown : E.largeCrown;
       const typeLabel = row.type === "small" ? "Small" : "Large";
       const questLabel = row.quest ? ` (${row.quest})` : "";

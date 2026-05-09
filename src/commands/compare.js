@@ -4,7 +4,7 @@ import { executeCompare } from "../logic/wishlist.js";
 export default {
   data: new SlashCommandBuilder()
     .setName("compare")
-    .setDescription("📊 Compare two hunters across crowns, collections, and wishlist goals")
+    .setDescription("Compare two hunters across crowns, collections, and wishlist goals")
     .setIntegrationTypes(0, 1)
     .setContexts(0, 1, 2)
     .addUserOption((option) =>

@@ -2,6 +2,7 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { getMonstersFromJson, handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
+import { ephemeralStatus } from "../responseEmbeds.js";
 
 function buildWishlistTypeLabel(type) {
   if (type === "both") return `${E.smallCrown} ${E.largeCrown}`;
@@ -9,7 +10,7 @@ function buildWishlistTypeLabel(type) {
 }
 
 function formatWishlistRow(row) {
-  const tempLabel = row.tempered ? `${E.tempered} ` : "";
+  const tempLabel = row.tempered ? "Tempered " : "";
   return `${row.emoji} **${row.monster_name}** (${tempLabel}${buildWishlistTypeLabel(row.type)})`;
 }
 
@@ -36,7 +37,7 @@ export async function executeCompare(interaction) {
   const sharedMatch = totalTrackedWishlist > 0 ? Math.round((both.length / totalTrackedWishlist) * 100) : 0;
 
   const embed = new EmbedBuilder()
-    .setTitle(`📊 Hunter Comparison`)
+    .setTitle(`${E.squadCounter} Hunter Comparison`)
     .setColor(0x9B59B6)
     .setFooter({ text: `${userA.username} vs ${userB.username}` })
     .setTimestamp();
@@ -82,21 +83,21 @@ export async function executeCompare(interaction) {
 
   if (both.length > 0) {
     embed.addFields({
-      name: `🤝 Shared Hunt Board (${both.length})`,
+      name: `${E.linkParty} Shared Hunt Board (${both.length})`,
       value: both.slice(0, 10).map(formatWishlistRow).join("\n").slice(0, 1024),
     });
   }
 
   if (onlyA.length > 0) {
     embed.addFields({
-      name: `🔵 Only ${userA.username} seeks (${onlyA.length})`,
+      name: `${E.hunt} Only ${userA.username} Seeks (${onlyA.length})`,
       value: onlyA.slice(0, 8).map(formatWishlistRow).join("\n").slice(0, 1024),
     });
   }
 
   if (onlyB.length > 0) {
     embed.addFields({
-      name: `🟣 Only ${userB.username} seeks (${onlyB.length})`,
+      name: `${E.hunt} Only ${userB.username} Seeks (${onlyB.length})`,
       value: onlyB.slice(0, 8).map(formatWishlistRow).join("\n").slice(0, 1024),
     });
   }
@@ -169,7 +170,13 @@ export default {
 
       const monster = await resolveMonsterName(monsterName);
       if (!monster) {
-        return interaction.reply({ content: `Monster **${monsterName}** not found.`, flags: MessageFlags.Ephemeral });
+        return interaction.reply(
+          ephemeralStatus({
+            title: "Monster Not Found",
+            description: `No monster matched **${monsterName}**. Try selecting one from autocomplete.`,
+            tone: "warning",
+          })
+        );
       }
 
       await db.execute({
@@ -180,17 +187,26 @@ export default {
       const typeLabel = type === 'both' ? "Small & Large Crowns" : (type === 'small' ? "Small Crown" : "Large Crown");
       const tempLabel = tempered ? "Tempered " : "";
 
-      return interaction.reply({
-        content: `✅ Added **${tempLabel}${monster.name}** (${typeLabel}) to your wishlist!`,
-        flags: MessageFlags.Ephemeral
-      });
+      return interaction.reply(
+        ephemeralStatus({
+          title: "Wishlist Updated",
+          description: `Added **${tempLabel}${monster.name}** (${typeLabel}) to your wishlist.`,
+          tone: "success",
+        })
+      );
 
     } else if (sub === "remove") {
       const monsterName = interaction.options.getString("monster")?.toLowerCase().trim();
       const monster = await resolveMonsterName(monsterName);
       
       if (!monster) {
-        return interaction.reply({ content: `Monster **${monsterName}** not found.`, flags: MessageFlags.Ephemeral });
+        return interaction.reply(
+          ephemeralStatus({
+            title: "Monster Not Found",
+            description: `No monster matched **${monsterName}**. Try selecting one from autocomplete.`,
+            tone: "warning",
+          })
+        );
       }
 
       await db.execute({
@@ -198,10 +214,13 @@ export default {
         args: [userId, monster.id]
       });
 
-      return interaction.reply({
-        content: `🗑️ Removed **${monster.name}** from your wishlist.`,
-        flags: MessageFlags.Ephemeral
-      });
+      return interaction.reply(
+        ephemeralStatus({
+          title: "Wishlist Updated",
+          description: `Removed **${monster.name}** from your wishlist.`,
+          tone: "info",
+        })
+      );
 
     } else if (sub === "view") {
       const res = await db.execute({
@@ -216,17 +235,23 @@ export default {
       });
 
       if (res.rows.length === 0) {
-        return interaction.reply({ content: "Your wishlist is empty!", flags: MessageFlags.Ephemeral });
+        return interaction.reply(
+          ephemeralStatus({
+            title: "Wishlist Empty",
+            description: "Your wishlist is currently empty.",
+            tone: "neutral",
+          })
+        );
       }
 
       const list = res.rows.map(row => {
         const typeLabel = row.type === 'both' ? "Both" : (row.type === 'small' ? "Small" : "Large");
-        const tempLabel = row.tempered ? `${E.tempered} ` : "";
+        const tempLabel = row.tempered ? "Tempered " : "";
         return `> ${row.emoji} **${row.monster_name}** (${tempLabel}${typeLabel})`;
       });
 
       const embed = new EmbedBuilder()
-        .setTitle("📝 Your Crown Wishlist")
+        .setTitle(`${E.notesCheckmark} Your Crown Wishlist`)
         .setDescription(list.join("\n"))
         .setColor(0x9B59B6)
         .setTimestamp();

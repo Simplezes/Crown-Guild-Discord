@@ -5,7 +5,7 @@ import { E } from "../emojis.js";
 
 const GROUPS = {
   crown: {
-    title: "👑  /crown - Collection Management",
+    title: `${E.completedObj}  /crown - Collection Management`,
     fields: [
       {
         name: "Actions", value: [
@@ -18,7 +18,7 @@ const GROUPS = {
     ]
   },
   hunt: {
-    title: "⚔️  /hunt - Multiplayer Activities",
+    title: `${E.hunt}  /hunt - Multiplayer Activities`,
     fields: [
       {
         name: "Actions", value: [
@@ -32,7 +32,7 @@ const GROUPS = {
     ]
   },
   wishlist: {
-    title: "📝  /wishlist - Missing Crowns",
+    title: `${E.notesCheckmark}  /wishlist - Missing Crowns`,
     fields: [
       {
         name: "Actions", value: [
@@ -56,7 +56,7 @@ const GROUPS = {
     ]
   },
   monster: {
-    title: "📖  /monster - Bestiary",
+    title: `${E.expeditionBoard}  /monster - Bestiary`,
     fields: [
       {
         name: "Actions", value: [
@@ -109,11 +109,11 @@ export default {
       .setThumbnail("attachment://icon.png")
       .setDescription("The Crown Guild is now easier to navigate! Use the grouped commands below:")
       .addFields(
-        { name: "👑  /crown", value: "Manage your monster crown collection.", inline: true },
-        { name: "⚔️  /hunt", value: "SOS flares, Radar, and Matchmaking.", inline: true },
-        { name: "📝  /wishlist", value: "Track the crowns you are seeking.", inline: true },
-        { name: "👤  /profile", value: "View your card and set your Lobby ID.", inline: true },
-        { name: "📖  /monster", value: "Lookup weaknesses and bestiary info.", inline: true }
+        { name: `${E.completedObj}  /crown`, value: "Manage your monster crown collection.", inline: true },
+        { name: `${E.hunt}  /hunt`, value: "SOS flares, Radar, and Matchmaking.", inline: true },
+        { name: `${E.notesCheckmark}  /wishlist`, value: "Track the crowns you are seeking.", inline: true },
+        { name: `${E.questMembers}  /profile`, value: "View your card and set your Lobby ID.", inline: true },
+        { name: `${E.expeditionBoard}  /monster`, value: "Lookup weaknesses and bestiary info.", inline: true }
       )
       .setFooter({ text: "Type / then select a group to see all actions!", iconURL: "attachment://icon.png" });
 

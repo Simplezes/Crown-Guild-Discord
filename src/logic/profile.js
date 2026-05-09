@@ -177,29 +177,66 @@ function buildProfileShareText(data, format = "compact") {
     return lines.join("\n");
   }
 
-  const grouped = { "S+L": [], Small: [], Large: [] };
-  shareMonsters.forEach((monster) => {
-    grouped[monster.category].push(monster.emoji || E.hunt);
-  });
+  const smallCrowns = [];
+  const largeCrowns = [];
+  const seenSmall = new Set();
+  const seenLarge = new Set();
 
-  const lines = [`**.${data.user.username} — Crown Collection**`, ""];
-
-  if (grouped["S+L"].length) {
-    lines.push(`**S+L** ${grouped["S+L"].slice(0, 30).join(" ")}`, "");
-  }
-  if (grouped.Small.length) {
-    lines.push(`**${E.smallCrown} Small** ${grouped.Small.slice(0, 30).join(" ")}`, "");
-  }
-  if (grouped.Large.length) {
-    lines.push(`**${E.largeCrown} Large** ${grouped.Large.slice(0, 30).join(" ")}`, "");
-  }
-
-  const compactWishlist = buildCompactWishlistLine(data.wishlist);
-  if (compactWishlist) {
-    lines.push(compactWishlist, "");
+  for (const crown of data.crowns) {
+    const key = `${crown.name}||${Number(crown.tempered ? 1 : 0)}`;
+    if (crown.type === "small" && !seenSmall.has(key)) {
+      seenSmall.add(key);
+      smallCrowns.push(crown);
+    } else if (crown.type === "large" && !seenLarge.has(key)) {
+      seenLarge.add(key);
+      largeCrowns.push(crown);
+    }
   }
 
-  lines.push(profileUrl);
+  function formatAvailLine(prefix, crowns) {
+    const regular = crowns.filter((c) => !c.tempered).map((c) => c.emoji || E.hunt);
+    const tempered = crowns.filter((c) => c.tempered).map((c) => c.emoji || E.hunt);
+    const parts = [...regular];
+    if (tempered.length) parts.push(`( ${tempered.join(" ")} 9★)`);
+    if (!parts.length) return null;
+    return `${prefix}: ${parts.join(" ")}`;
+  }
+
+  const sLine = formatAvailLine("S", smallCrowns);
+  const lLine = formatAvailLine("L", largeCrowns);
+
+  const pairMap = new Map();
+  for (const crown of data.crowns) {
+    if (!crown.pair_id) continue;
+    const pairId = String(crown.pair_id);
+    if (!pairMap.has(pairId)) pairMap.set(pairId, []);
+    pairMap.get(pairId).push(crown);
+  }
+
+  const multiPairs = [];
+  const seenPairLabels = new Set();
+  for (const pair of pairMap.values()) {
+    if (pair.length < 2) continue;
+    const label = pair
+      .slice(0, 2)
+      .map((c) => `${c.type === "small" ? "S" : "L"} ${c.emoji || E.hunt}`)
+      .join(" + ");
+    if (!seenPairLabels.has(label)) {
+      seenPairLabels.add(label);
+      multiPairs.push(label);
+    }
+  }
+
+  const lines = ["Available:"];
+  if (sLine) lines.push(sLine);
+  if (lLine) lines.push(lLine);
+
+  if (multiPairs.length) {
+    lines.push("Multi-Quest:");
+    lines.push(multiPairs.join(" / "));
+  }
+
+  lines.push("", profileUrl);
   return lines.join("\n");
 }
 

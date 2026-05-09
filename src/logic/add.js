@@ -13,6 +13,7 @@ import db from "../database.js";
 import { handleMonsterAutocomplete, resolveMonsterName, capitalize, formatMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
 import crypto from "crypto";
+import { ephemeralStatus } from "../responseEmbeds.js";
 
 const WEB_BASE_URL = process.env.WEB_HUB_URL;
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -87,7 +88,7 @@ function buildConfigEmbed(session) {
   }
 
   const embed = new EmbedBuilder()
-    .setTitle(`${monster.emoji || "🐉"} Crown Add Configurator`)
+    .setTitle(`${monster.emoji || E.hunt} Crown Add Configurator`)
     .setDescription(lines.join("\n"))
     .setColor(0xC4982A)
     .setFooter({ text: "Use dropdowns and buttons, then submit." })
@@ -272,7 +273,7 @@ async function saveCrownEntry(interaction, session) {
   if (investigationLine) lines.push(investigationLine);
 
   const embed = new EmbedBuilder()
-    .setTitle(`${monster.emoji || "🐉"} Crown Added!`)
+    .setTitle(`${monster.emoji || E.hunt} Crown Added!`)
     .setDescription(lines.join("\n"))
     .setColor(0x57f287)
     .setTimestamp();
@@ -297,10 +298,13 @@ export default {
     const monsterName = interaction.options.getString("monster")?.toLowerCase().trim();
     const monster = await resolveMonsterName(monsterName);
     if (!monster) {
-      return interaction.reply({
-        content: `Monster **${monsterName}** not found. Please select one from the list!`,
-        flags: MessageFlags.Ephemeral,
-      });
+      return interaction.reply(
+        ephemeralStatus({
+          title: "Monster Not Found",
+          description: `No monster matched **${monsterName}**. Please select one from autocomplete.`,
+          tone: "warning",
+        })
+      );
     }
 
     const sessionId = crypto.randomUUID();
@@ -339,19 +343,34 @@ export default {
       const msg = "This crown setup has expired. Please run `/crown add` again.";
       if (interaction.isButton() || interaction.isStringSelectMenu()) {
         if (interaction.deferred || interaction.replied) {
-          await interaction.followUp({ content: msg, flags: MessageFlags.Ephemeral });
+          await interaction.followUp(
+            ephemeralStatus({
+              title: "Setup Expired",
+              description: msg,
+              tone: "neutral",
+            })
+          );
         } else {
-          await interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
+          await interaction.reply(
+            ephemeralStatus({
+              title: "Setup Expired",
+              description: msg,
+              tone: "neutral",
+            })
+          );
         }
       }
       return true;
     }
 
     if (interaction.user.id !== session.userId) {
-      await interaction.reply({
-        content: "Only the hunter who opened this setup can use these controls.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.reply(
+        ephemeralStatus({
+          title: "Action Blocked",
+          description: "Only the hunter who opened this setup can use these controls.",
+          tone: "warning",
+        })
+      );
       return true;
     }
 
@@ -450,7 +469,13 @@ export default {
       addSessions.delete(session.sessionId);
 
       if (result.error) {
-        await interaction.reply({ content: result.error, flags: MessageFlags.Ephemeral });
+        await interaction.reply(
+          ephemeralStatus({
+            title: "Could Not Save Crown",
+            description: result.error,
+            tone: "danger",
+          })
+        );
         return true;
       }
 
@@ -468,18 +493,24 @@ export default {
     const session = addSessions.get(parsed.sessionId);
     if (!session || isSessionExpired(session)) {
       addSessions.delete(parsed.sessionId);
-      await interaction.reply({
-        content: "This crown setup has expired. Please run `/crown add` again.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.reply(
+        ephemeralStatus({
+          title: "Setup Expired",
+          description: "This crown setup has expired. Please run `/crown add` again.",
+          tone: "neutral",
+        })
+      );
       return true;
     }
 
     if (interaction.user.id !== session.userId) {
-      await interaction.reply({
-        content: "Only the hunter who opened this setup can use these controls.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.reply(
+        ephemeralStatus({
+          title: "Action Blocked",
+          description: "Only the hunter who opened this setup can use these controls.",
+          tone: "warning",
+        })
+      );
       return true;
     }
 
@@ -488,16 +519,25 @@ export default {
       if (!input) {
         session.data.hostMonsterName = null;
         addSessions.set(session.sessionId, session);
-        await interaction.reply({ content: "Host monster reset to target monster.", flags: MessageFlags.Ephemeral });
+        await interaction.reply(
+          ephemeralStatus({
+            title: "Host Monster Updated",
+            description: "Host monster reset to target monster.",
+            tone: "info",
+          })
+        );
         return true;
       }
 
       session.data.hostMonsterName = input;
       addSessions.set(session.sessionId, session);
-      await interaction.reply({
-        content: `Host monster set to **${input}**.`,
-        flags: MessageFlags.Ephemeral,
-      });
+      await interaction.reply(
+        ephemeralStatus({
+          title: "Host Monster Updated",
+          description: `Host monster set to **${input}**.`,
+          tone: "success",
+        })
+      );
       return true;
     }
 
@@ -506,19 +546,37 @@ export default {
       if (!raw) {
         session.data.investigationUses = null;
         addSessions.set(session.sessionId, session);
-        await interaction.reply({ content: "Uses reset to auto mode.", flags: MessageFlags.Ephemeral });
+        await interaction.reply(
+          ephemeralStatus({
+            title: "Investigation Uses Updated",
+            description: "Uses reset to auto mode.",
+            tone: "info",
+          })
+        );
         return true;
       }
 
       const uses = Number(raw);
       if (![1, 2, 3].includes(uses)) {
-        await interaction.reply({ content: "Uses must be 1, 2, or 3.", flags: MessageFlags.Ephemeral });
+        await interaction.reply(
+          ephemeralStatus({
+            title: "Invalid Uses Value",
+            description: "Uses must be 1, 2, or 3.",
+            tone: "warning",
+          })
+        );
         return true;
       }
 
       session.data.investigationUses = uses;
       addSessions.set(session.sessionId, session);
-      await interaction.reply({ content: `Investigation uses set to **${uses}**.`, flags: MessageFlags.Ephemeral });
+      await interaction.reply(
+        ephemeralStatus({
+          title: "Investigation Uses Updated",
+          description: `Investigation uses set to **${uses}**.`,
+          tone: "success",
+        })
+      );
       return true;
     }
 

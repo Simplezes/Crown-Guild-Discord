@@ -3,6 +3,7 @@ import db from "../database.js";
 import { handleMonsterAutocomplete, resolveMonsterName, capitalize, formatMonsterName } from "../utils.js";
 import { buildPage } from "../pagination.js";
 import { E } from "../emojis.js";
+import { ephemeralStatus } from "../responseEmbeds.js";
 
 const WEB_BASE_URL = process.env.WEB_HUB_URL;
 
@@ -27,7 +28,7 @@ export default {
       res.rows.forEach((row) => {
         let keyName = row.name;
         if (row.tempered) keyName = `Tempered ${row.name}`;
-        if (!grouped[keyName]) grouped[keyName] = { small: [], large: [], emoji: row.emoji || "🐉" };
+        if (!grouped[keyName]) grouped[keyName] = { small: [], large: [], emoji: row.emoji || E.hunt };
         grouped[keyName][row.type].push(`<@${row.user_id}>`);
       });
 
@@ -59,7 +60,13 @@ export default {
 
     const monster = await resolveMonsterName(monsterName);
     if (!monster) {
-      return interaction.reply({ content: `Monster **${monsterName}** not found.`, flags: MessageFlags.Ephemeral });
+      return interaction.reply(
+        ephemeralStatus({
+          title: "Monster Not Found",
+          description: `No monster matched **${monsterName}**. Try selecting one from autocomplete.`,
+          tone: "warning",
+        })
+      );
     }
 
     const res = await db.execute({
@@ -87,7 +94,7 @@ export default {
     };
 
     const embed = new EmbedBuilder()
-      .setTitle(`${monster.emoji || "🐉"} ${mName} Holders`)
+      .setTitle(`${monster.emoji || E.hunt} ${mName} Holders`)
       .addFields(
         { name: `${E.smallCrown} Small Crown`, value: formatHolders(smallHolders), inline: true },
         { name: `${E.largeCrown} Large Crown`, value: formatHolders(largeHolders), inline: true }

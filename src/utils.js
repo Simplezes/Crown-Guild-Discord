@@ -193,7 +193,7 @@ export async function resolveMonsterName(input) {
       name: monster.name,
       image_name: monster.games?.[0]?.image,
       is_large: monster.isLarge,
-      emoji: E[emojiKey] || "🐉"
+      emoji: E[emojiKey] || E.hunt
     };
   }
 
@@ -206,7 +206,7 @@ export async function resolveMonsterName(input) {
       name: monster.name,
       image_name: monster.games?.[0]?.image,
       is_large: monster.isLarge,
-      emoji: E[emojiKey] || "🐉"
+      emoji: E[emojiKey] || E.hunt
     };
   }
 
@@ -229,7 +229,7 @@ export async function resolveMonsterName(input) {
       name: best.name,
       image_name: best.games?.[0]?.image,
       is_large: best.isLarge,
-      emoji: E[emojiKey] || "🐉"
+      emoji: E[emojiKey] || E.hunt
     };
   }
 

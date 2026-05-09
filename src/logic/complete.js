@@ -2,6 +2,7 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
 import { formatMonsterName, deductInvestigationUse } from "../utils.js";
+import { ephemeralStatus } from "../responseEmbeds.js";
 
 export default {
   async execute(interaction) {
@@ -17,7 +18,13 @@ export default {
     });
 
     if (missionRes.rows.length === 0) {
-      return interaction.reply({ content: "You do not have an active mission!", flags: MessageFlags.Ephemeral });
+      return interaction.reply(
+        ephemeralStatus({
+          title: "No Active Mission",
+          description: "You currently have no active hunt mission to complete.",
+          tone: "neutral",
+        })
+      );
     }
 
     const mission = missionRes.rows[0];
@@ -46,10 +53,13 @@ export default {
       if (!allConfirmed) {
         const confirmedCount = groupRes.rows.filter(m => m.hunter_confirmed === 1).length;
         const total = groupRes.rows.length;
-        return interaction.reply({
-          content: `${E.notesCheckmark} Crown logged! Waiting for the rest of the party... (**${confirmedCount}/${total}** confirmed)`,
-          flags: MessageFlags.Ephemeral
-        });
+        return interaction.reply(
+          ephemeralStatus({
+            title: `${E.notesCheckmark} Crown Logged`,
+            description: `Waiting for the rest of the party to confirm. **${confirmedCount}/${total}** hunters confirmed.`,
+            tone: "info",
+          })
+        );
       }
 
       for (const m of groupRes.rows) {
@@ -83,7 +93,7 @@ export default {
       const embed = new EmbedBuilder()
         .setTitle(`${E.notesCheckmark} Group Quest Complete!`)
         .setDescription([
-          `All hunters have confirmed the crown for ${mission.emoji || "🐉"} **${displayName}**!`,
+          `All hunters have confirmed the crown for ${mission.emoji || E.hunt} **${displayName}**!`,
           `> **Host:** <@${mission.host_id}>`,
           `> **Target:** ${typeEmoji} ${typeLabel}`,
           `> **Hunters:** ${groupRes.rows.map(m => `<@${m.requester_id}>`).join(", ")}`,
@@ -111,7 +121,7 @@ export default {
     const embed = new EmbedBuilder()
       .setTitle(`${E.notesCheckmark} Mission Completed!`)
       .setDescription([
-        `Successfully completed the hunt for ${mission.emoji || "🐉"} **${displayName}**!`,
+        `Successfully completed the hunt for ${mission.emoji || E.hunt} **${displayName}**!`,
         `> **Host:** <@${mission.host_id}>`,
         `> **Target:** ${typeEmoji} ${typeLabel}`,
         "",

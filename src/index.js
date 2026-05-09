@@ -8,6 +8,7 @@ import { pusherServer } from "./pusher.js";
 import { refreshFlareEmbed } from "./events/interactionCreate.js";
 import PusherClient from "pusher-js";
 import { formatMonsterName } from "./utils.js";
+import { E } from "./emojis.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,12 +51,12 @@ channel.bind("flare_updated", async (data) => {
       if (data.tempered) displayName = `Tempered ${displayName}`;
       const typeLabel = data.crownType === 'small' ? "Small Crown" : "Large Crown";
       const hunterList = data.hunters?.length > 0
-        ? data.hunters.map(h => `> 🗡️ **${h}**`).join("\n")
+        ? data.hunters.map(h => `> ${E.questMembers} **${h}**`).join("\n")
         : "> *No hunters were in queue*";
       const lobbyLine = data.sessionId ? `> **Lobby ID:** \`${data.sessionId}\`` : "";
 
       const embed = new EmbedBuilder()
-        .setTitle(`⚔️ Quest Started: ${displayName}!`)
+        .setTitle(`${E.hunt} Quest Started: ${displayName}!`)
         .setDescription([
           `**${data.hostName}** has launched the hunt for ${data.monsterEmoji} **${displayName}**!`,
           `> **Target:** ${typeLabel} (${data.strengthRating}★)`,
@@ -70,7 +71,7 @@ channel.bind("flare_updated", async (data) => {
         .setTimestamp();
 
       const doneRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("quest_started_web").setLabel("⚔️ Quest Started!").setStyle(ButtonStyle.Success).setDisabled(true)
+        new ButtonBuilder().setCustomId("quest_started_web").setLabel("Quest Started").setStyle(ButtonStyle.Success).setDisabled(true)
       );
 
       await msg.edit({ embeds: [embed], components: [doneRow], attachments: [] }).catch(() => {});
@@ -103,7 +104,7 @@ for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
   const fileUrl = pathToFileURL(filePath).href;
   const { default: command } = await import(fileUrl);
-  if ("data" in command && "execute" in command) {
+  if (command && command.data && typeof command.execute === "function") {
     client.commands.set(command.data.name, command);
   }
 }
@@ -181,7 +182,7 @@ async function pollWebNotifications() {
               const buttons = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                   .setCustomId(`accept_req_${row.monster_id}_${row.crown_type}_${row.user_id}`)
-                  .setLabel("✅ Accept Hunt")
+                  .setLabel("Accept Hunt")
                   .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
                   .setLabel("View Profile")
@@ -215,7 +216,7 @@ async function pollWebNotifications() {
 
               const embed = new EmbedBuilder()
                 .setTitle("<:MHWildsHunt_Icon:1500270140682404001> Mission Undergoing!")
-                .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${row.host_id}>\n**Requester:** <@${row.user_id}>\n**Target:** ${row.emoji || "🐉"} **${targetName}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/complete\`!`)
+                .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${row.host_id}>\n**Requester:** <@${row.user_id}>\n**Target:** ${row.emoji || E.hunt} **${targetName}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/complete\`!`)
                 .setColor(0x3498DB)
                 .setTimestamp();
               
@@ -276,7 +277,7 @@ async function syncAcceptedToDiscord() {
 
           const embed = new EmbedBuilder()
             .setTitle("<:MHWildsHunt_Icon:1500270140682404001> Mission Undergoing!")
-            .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${row.recipient_id}>\n**Requester:** <@${row.user_id}>\n**Target:** ${row.monster_emoji || "🐉"} **${displayParts}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/complete\`!`)
+            .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${row.recipient_id}>\n**Requester:** <@${row.user_id}>\n**Target:** ${row.monster_emoji || E.hunt} **${displayParts}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/complete\`!`)
             .setColor(0x3498DB)
             .setTimestamp();
 
@@ -290,7 +291,7 @@ async function syncAcceptedToDiscord() {
           await msg.edit({ embeds: [embed], components: [] }).catch(() => { });
         } else if (row.status === 'cancelled') {
           const embed = new EmbedBuilder()
-            .setTitle("⌛ Request Cancelled")
+            .setTitle("Request Cancelled")
             .setDescription(`This SOS flare for **${row.monster_name}** is no longer active. Another host may have accepted it.`)
             .setColor(0x95A5A6)
             .setTimestamp();
@@ -344,9 +345,9 @@ async function checkExpiredMissions() {
       const typeLabel = mission.type === 'small' ? "Small Crown" : "Large Crown";
 
       const embed = new EmbedBuilder()
-        .setTitle("⏱️ Quest Timer Expired")
+        .setTitle("Quest Timer Expired")
         .setDescription([
-          `Your quest timer has expired for ${mission.emoji || "🐉"} **${displayName}** (${typeLabel}).`,
+          `Your quest timer has expired for ${mission.emoji || E.hunt} **${displayName}** (${typeLabel}).`,
           `> **Host:** ${mission.host_name}`,
           "",
           `Did you complete the hunt and get the crown?`
@@ -357,11 +358,11 @@ async function checkExpiredMissions() {
       const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`quest_timeout_yes_${mission.id}`)
-          .setLabel("✅ Yes, got the Crown!")
+          .setLabel("Yes, Got The Crown")
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId(`quest_timeout_no_${mission.id}`)
-          .setLabel("❌ No, didn't complete")
+          .setLabel("No, Did Not Complete")
           .setStyle(ButtonStyle.Danger)
       );
 
@@ -379,9 +380,9 @@ async function checkExpiredMissions() {
       const typeLabel = mission.type === 'small' ? "Small Crown" : "Large Crown";
 
       const embed = new EmbedBuilder()
-        .setTitle("⏱️ Group Quest Timer Expired")
+        .setTitle("Group Quest Timer Expired")
         .setDescription([
-          `Your hosted group quest for ${mission.emoji || "🐉"} **${displayName}** (${typeLabel}) has expired.`,
+          `Your hosted group quest for ${mission.emoji || E.hunt} **${displayName}** (${typeLabel}) has expired.`,
           "",
           `Hunters have been prompted to confirm if they completed the hunt.`
         ].join("\n"))

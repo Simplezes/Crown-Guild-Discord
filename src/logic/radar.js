@@ -39,7 +39,7 @@ export default {
     });
 
     const embed = new EmbedBuilder()
-      .setTitle("📡 Active SOS Radar")
+      .setTitle(`${E.communication} Active SOS Radar`)
       .setDescription(flareLines.join("\n\n"))
       .setColor(0x3498DB)
       .setTimestamp();

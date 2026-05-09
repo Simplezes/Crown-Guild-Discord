@@ -1,7 +1,7 @@
 export const E = {
   smallCrown: "<:smallcrown:1500245360323465386>",
   largeCrown: "<:largecrown:1500245422210420829>",
-  tempered: "🔥",
+  tempered: "🅃",
 
   communication: "<:MHWildsCommunication_Menu_Icon:1500270158202015837>",
   completedObj: "<:MHWildsCompleted_Objective_Icon:1500270226049204244>",

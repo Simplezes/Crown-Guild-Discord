@@ -39,7 +39,7 @@ export default {
       );
 
       const embed = new EmbedBuilder()
-        .setTitle("⚠️ Are you sure?")
+        .setTitle("Final Confirmation")
         .setDescription(`This will permanently delete all **${total} crowns** from your collection. This cannot be undone.`)
         .setColor(0xed4245);
 
@@ -58,7 +58,7 @@ export default {
     }
 
     const displayName = monster.name.charAt(0).toUpperCase() + monster.name.slice(1);
-    const monsterEmoji = monster.emoji || "🐉";
+    const monsterEmoji = monster.emoji || E.hunt;
 
     const crownRes = await db.execute({
       sql: "SELECT id, investigation_id, tempered, strength_rating FROM crowns WHERE user_id = ? AND monster_id = ? AND type = ? ORDER BY id DESC LIMIT 1",
