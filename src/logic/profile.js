@@ -183,7 +183,7 @@ function buildProfileShareText(data, format = "compact") {
   const seenLarge = new Set();
 
   for (const crown of data.crowns) {
-    const key = `${crown.name}||${Number(crown.tempered ? 1 : 0)}`;
+    const key = `${crown.name}||${Number(crown.tempered ? 1 : 0)}||${Number(crown.strength_rating || 0)}`;
     if (crown.type === "small" && !seenSmall.has(key)) {
       seenSmall.add(key);
       smallCrowns.push(crown);
@@ -195,9 +195,19 @@ function buildProfileShareText(data, format = "compact") {
 
   function formatAvailLine(prefix, crowns) {
     const regular = crowns.filter((c) => !c.tempered).map((c) => c.emoji || E.hunt);
-    const tempered = crowns.filter((c) => c.tempered).map((c) => c.emoji || E.hunt);
+    const temperedByStrength = new Map();
+    crowns
+      .filter((c) => c.tempered)
+      .forEach((crown) => {
+        const strength = Number(crown.strength_rating || 0);
+        const label = strength > 0 ? `${strength}★` : "Tempered";
+        if (!temperedByStrength.has(label)) temperedByStrength.set(label, []);
+        temperedByStrength.get(label).push(crown.emoji || E.hunt);
+      });
     const parts = [...regular];
-    if (tempered.length) parts.push(`( ${tempered.join(" ")} 9★)`);
+    for (const [label, emojis] of temperedByStrength.entries()) {
+      parts.push(`(${label}: ${emojis.join(" ")})`);
+    }
     if (!parts.length) return null;
     return `${prefix}: ${parts.join(" ")}`;
   }
