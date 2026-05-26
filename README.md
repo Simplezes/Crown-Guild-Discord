@@ -42,11 +42,11 @@ The Discord half of Crown Guild. Handles slash commands for logging crowns, find
 ## Setup
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env
 # fill in .env
-npm run deploy   # register slash commands
-npm run start
+pnpm run deploy   # register slash commands
+pnpm start
 ```
 
 `WEB_HUB_URL` should point to your deployed web app (or `http://localhost:3000` in dev)  it's used for profile links in bot responses and Pusher triggers.
