@@ -54,7 +54,7 @@ export default {
 
     const opts = {
       color: COLORS.brand,
-      authorName: `${targetUser.username}  •  Crown Collection`,
+      authorName: `${targetUser.username}  •  Inventory`,
       authorIconUrl: targetUser.displayAvatarURL(),
       thumbnailUrl: `${WEB_BASE_URL}/icon.png`,
       footerSuffix: `${Object.keys(collection).length} monsters tracked`,

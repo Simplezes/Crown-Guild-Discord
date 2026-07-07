@@ -229,7 +229,7 @@ export default {
 
           opts = {
             color: COLORS.brand,
-            authorName: `${targetName}  •  Crown Collection`,
+            authorName: `${targetName}  •  Inventory`,
             authorIconUrl: targetAvatar,
             thumbnailUrl: `${WEB_BASE_URL}/icon.png`,
             footerSuffix: `${Object.keys(collection).length} monsters tracked`,

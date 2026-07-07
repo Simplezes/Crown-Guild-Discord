@@ -163,7 +163,7 @@ function buildProfileShareText(data, format = "compact") {
 
   if (format === "text") {
     const lines = [
-      `**.${data.user.username} - Crown Collection**`,
+      `**.${data.user.username} - Inventory**`,
       "",
       `Small + Large: ${slCount} monster${slCount !== 1 ? "s" : ""}`,
       `Small Crown: ${smallCount} monster${smallCount !== 1 ? "s" : ""}`,
@@ -413,7 +413,7 @@ function buildOverviewEmbed(data) {
       inline: true,
     },
     {
-      name: "Crown Ledger",
+      name: "Inventory",
       value: `Total: **${data.stats.total}**\n${E.smallCrown} ${data.stats.small}  •  ${E.largeCrown} ${data.stats.large}\n${E.tempered} Tempered: **${data.stats.tempered}**`,
       inline: true,
     },
@@ -683,7 +683,7 @@ export async function buildProfileMessage(userId, client, section = "overview", 
       "crowns",
       page,
       buildCrownEntries(data.crowns),
-      "Crown Ledger",
+      "Inventory",
       `${data.stats.total} crowns recorded`,
       "*No crowns recorded yet.*"
     );
