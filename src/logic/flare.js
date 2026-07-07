@@ -2,7 +2,7 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlag
 import db from "../database.js";
 import { handleMyCrownedMonsterAutocomplete, resolveMonsterName, capitalize, formatMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
-import { ephemeralStatus } from "../responseEmbeds.js";
+import { ephemeralStatus, COLORS, applyBrandFooter } from "../responseEmbeds.js";
 
 const WEB_HUB_URL = process.env.WEB_HUB_URL;
 
@@ -11,7 +11,7 @@ export function buildFlareEmbed({ displayName, monsterEmoji, typeEmoji, typeLabe
     ? members.map(m => `> ${E.questMembers} **${m.username}**`).join("\n")
     : `> *No hunters in queue yet...*`;
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle(`${E.linkParty} SOS Flare: ${displayName}!`)
     .setDescription([
       `**${hostUsername}** is hosting for ${monsterEmoji} **${displayName}**`,
@@ -23,9 +23,10 @@ export function buildFlareEmbed({ displayName, monsterEmoji, typeEmoji, typeLabe
       "",
       `[${E.communication} View on Crown Guild Hub](${WEB_HUB_URL})`,
     ].join("\n"))
-    .setColor(0xFF4500)
-    .setFooter({ text: "Flares expire after 5 minutes. Use Leave to remove yourself." })
+    .setColor(COLORS.urgent)
     .setTimestamp();
+
+  return applyBrandFooter(embed, "Flares expire after 5 minutes. Use Leave to remove yourself.");
 }
 
 export function buildFlareButtons(flareId) {

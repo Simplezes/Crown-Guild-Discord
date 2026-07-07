@@ -3,7 +3,7 @@ import db from "../database.js";
 import { E } from "../emojis.js";
 import { buildPage } from "../pagination.js";
 import { capitalize } from "../utils.js";
-import { ephemeralStatus } from "../responseEmbeds.js";
+import { ephemeralStatus, COLORS } from "../responseEmbeds.js";
 
 const WEB_BASE_URL = process.env.WEB_HUB_URL;
 
@@ -53,7 +53,7 @@ export default {
     });
 
     const opts = {
-      color: 0xC4982A,
+      color: COLORS.brand,
       authorName: `${targetUser.username}  •  Crown Collection`,
       authorIconUrl: targetUser.displayAvatarURL(),
       thumbnailUrl: `${WEB_BASE_URL}/icon.png`,

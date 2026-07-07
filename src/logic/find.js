@@ -3,7 +3,7 @@ import db from "../database.js";
 import { handleMonsterAutocomplete, resolveMonsterName, capitalize, formatMonsterName } from "../utils.js";
 import { buildPage } from "../pagination.js";
 import { E } from "../emojis.js";
-import { ephemeralStatus } from "../responseEmbeds.js";
+import { ephemeralStatus, COLORS, applyBrandFooter } from "../responseEmbeds.js";
 
 const WEB_BASE_URL = process.env.WEB_HUB_URL;
 
@@ -46,7 +46,7 @@ export default {
       const iconUrl = `${WEB_BASE_URL}/icon.png`;
 
       const opts = {
-        color: 0xC4982A,
+        color: COLORS.brand,
         authorName: "Crown Guild  •  Crown Registry",
         authorIconUrl: iconUrl,
         thumbnailUrl: iconUrl,
@@ -84,23 +84,28 @@ export default {
 
     const mName = formatMonsterName(monster.name, false);
 
+    const HOLDER_PREVIEW_COUNT = 15;
     const formatHolders = (holders) => {
       if (holders.length === 0) return "*None Recorded*";
-      return holders.map(h => {
+      const lines = holders.slice(0, HOLDER_PREVIEW_COUNT).map(h => {
         const t = h.tempered ? `${E.tempered} ` : "";
         const u = h.quest === "Investigation Quests" && h.remaining_uses !== null ? ` (${h.remaining_uses} uses)` : "";
         return `> <@${h.user_id}> - ${t}${h.strength_rating}★${u}`;
-      }).join("\n");
+      });
+      const remaining = holders.length - HOLDER_PREVIEW_COUNT;
+      if (remaining > 0) lines.push(`> *+${remaining} more on the [Guild Hub](${WEB_BASE_URL}/monster/${monster.name})*`);
+      return lines.join("\n");
     };
 
     const embed = new EmbedBuilder()
       .setTitle(`${monster.emoji || E.hunt} ${mName} Holders`)
       .addFields(
-        { name: `${E.smallCrown} Small Crown`, value: formatHolders(smallHolders), inline: true },
-        { name: `${E.largeCrown} Large Crown`, value: formatHolders(largeHolders), inline: true }
+        { name: `${E.smallCrown} Small Crown (${smallHolders.length})`, value: formatHolders(smallHolders), inline: true },
+        { name: `${E.largeCrown} Large Crown (${largeHolders.length})`, value: formatHolders(largeHolders), inline: true }
       )
-      .setColor(0xC4982A)
+      .setColor(COLORS.brand)
       .setTimestamp();
+    applyBrandFooter(embed);
 
     if (monster.image_name) {
       embed.setThumbnail(`${WEB_BASE_URL}/monsters/${monster.image_name}`);

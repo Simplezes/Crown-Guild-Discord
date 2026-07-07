@@ -2,7 +2,7 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { getMonstersFromJson, handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
-import { ephemeralStatus } from "../responseEmbeds.js";
+import { ephemeralStatus, COLORS, applyBrandFooter } from "../responseEmbeds.js";
 
 function buildWishlistTypeLabel(type) {
   if (type === "both") return `${E.smallCrown} ${E.largeCrown}`;
@@ -38,9 +38,9 @@ export async function executeCompare(interaction) {
 
   const embed = new EmbedBuilder()
     .setTitle(`${E.squadCounter} Hunter Comparison`)
-    .setColor(0x9B59B6)
-    .setFooter({ text: `${userA.username} vs ${userB.username}` })
+    .setColor(COLORS.legendary)
     .setTimestamp();
+  applyBrandFooter(embed, `${userA.username} vs ${userB.username}`);
 
   embed.addFields(
     {
@@ -253,8 +253,9 @@ export default {
       const embed = new EmbedBuilder()
         .setTitle(`${E.notesCheckmark} Your Crown Wishlist`)
         .setDescription(list.join("\n"))
-        .setColor(0x9B59B6)
+        .setColor(COLORS.legendary)
         .setTimestamp();
+      applyBrandFooter(embed);
 
       return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }

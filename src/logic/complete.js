@@ -2,7 +2,8 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
 import { formatMonsterName, deductInvestigationUse } from "../utils.js";
-import { ephemeralStatus } from "../responseEmbeds.js";
+import { ephemeralStatus, COLORS, applyBrandFooter } from "../responseEmbeds.js";
+import { notifyUsers } from "../pusher.js";
 
 export default {
   async execute(interaction) {
@@ -45,10 +46,9 @@ export default {
       });
 
       const allConfirmed = groupRes.rows.every(m => m.hunter_confirmed === 1);
+      const groupRecipients = [...new Set([groupRes.rows[0]?.host_id, ...groupRes.rows.map(m => m.requester_id)])];
 
-      if (interaction.client.pusher) {
-        interaction.client.pusher.trigger("public-channel", "mission_update", { type: 'group_confirmed' }).catch(() => {});
-      }
+      notifyUsers(groupRecipients, "mission_update", { type: 'group_confirmed' }).catch(() => {});
 
       if (!allConfirmed) {
         const confirmedCount = groupRes.rows.filter(m => m.hunter_confirmed === 1).length;
@@ -85,8 +85,8 @@ export default {
         args: [mission.group_id]
       });
 
+      notifyUsers(groupRecipients, "mission_update", { status: 'completed', groupId: mission.group_id }).catch(() => {});
       if (interaction.client.pusher) {
-        interaction.client.pusher.trigger("public-channel", "mission_update", { status: 'completed', groupId: mission.group_id }).catch(() => {});
         interaction.client.pusher.trigger("public-channel", "crown_update", {}).catch(() => {});
       }
 
@@ -100,8 +100,9 @@ export default {
           "",
           `Congratulations to the whole party, Hunters!`,
         ].join("\n"))
-        .setColor(0x2ECC71)
+        .setColor(COLORS.success)
         .setTimestamp();
+      applyBrandFooter(embed);
 
       return interaction.reply({ embeds: [embed] });
     }
@@ -127,11 +128,12 @@ export default {
         "",
         `Congratulations on the new crown, Hunter!`,
       ].join("\n"))
-      .setColor(0x2ECC71)
+      .setColor(COLORS.success)
       .setTimestamp();
+    applyBrandFooter(embed);
 
+    notifyUsers([mission.host_id, mission.requester_id], "mission_update", { status: 'completed', hostId: mission.host_id, requesterId: mission.requester_id }).catch(() => {});
     if (interaction.client.pusher) {
-      interaction.client.pusher.trigger("public-channel", "mission_update", { status: 'completed', hostId: mission.host_id, requesterId: mission.requester_id }).catch(() => {});
       interaction.client.pusher.trigger("public-channel", "crown_update", {}).catch(() => {});
     }
 

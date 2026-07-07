@@ -2,6 +2,7 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
 import { formatMonsterName } from "../utils.js";
+import { COLORS, applyBrandFooter } from "../responseEmbeds.js";
 
 export default {
   async execute(interaction) {
@@ -41,8 +42,9 @@ export default {
     const embed = new EmbedBuilder()
       .setTitle(`${E.communication} Active SOS Radar`)
       .setDescription(flareLines.join("\n\n"))
-      .setColor(0x3498DB)
+      .setColor(COLORS.urgent)
       .setTimestamp();
+    applyBrandFooter(embed);
 
     await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },

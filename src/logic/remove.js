@@ -4,6 +4,7 @@ import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
 import path from "path";
 import fs from "fs";
+import { COLORS, applyBrandFooter } from "../responseEmbeds.js";
 
 export default {
   async autocomplete(interaction) {
@@ -41,7 +42,7 @@ export default {
       const embed = new EmbedBuilder()
         .setTitle("Final Confirmation")
         .setDescription(`This will permanently delete all **${total} crowns** from your collection. This cannot be undone.`)
-        .setColor(0xed4245);
+        .setColor(COLORS.danger);
 
       return interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
     }
@@ -109,8 +110,9 @@ export default {
     const embed = new EmbedBuilder()
       .setTitle(`${monsterEmoji} Crown Removed`)
       .setDescription(`Successfully removed the ${typeEmoji} **${typeLabel}** for **${finalDisplayName}** ${displaySuffix} from your collection.`)
-      .setColor(0xed4245)
+      .setColor(COLORS.neutral)
       .setTimestamp();
+    applyBrandFooter(embed);
 
     if (interaction.client.pusher) {
       interaction.client.pusher.trigger("public-channel", "crown_update", {});

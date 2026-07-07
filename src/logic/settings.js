@@ -1,7 +1,7 @@
 import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
-import { ephemeralStatus } from "../responseEmbeds.js";
+import { ephemeralStatus, COLORS, applyBrandFooter } from "../responseEmbeds.js";
 
 export default {
   async execute(interaction) {
@@ -20,6 +20,16 @@ export default {
         ephemeralStatus({
           title: "Invalid Password",
           description: "Quest Password must be exactly 4 digits.",
+          tone: "warning",
+        })
+      );
+    }
+
+    if (status !== null && status.length > 200) {
+      return interaction.reply(
+        ephemeralStatus({
+          title: "Status Too Long",
+          description: "Status message must be 200 characters or fewer.",
           tone: "warning",
         })
       );
@@ -50,8 +60,9 @@ export default {
     const embed = new EmbedBuilder()
       .setTitle(`${E.settings} Settings Updated`)
       .setDescription("Your hunter profile has been successfully updated.")
-      .setColor(0x3498DB)
+      .setColor(COLORS.brand)
       .setTimestamp();
+    applyBrandFooter(embed);
 
     if (lobbyId) embed.addFields({ name: "Lobby ID", value: `\`${lobbyId}\``, inline: true });
     if (normalizedPassword) embed.addFields({ name: "Password", value: `\`${normalizedPassword}\``, inline: true });

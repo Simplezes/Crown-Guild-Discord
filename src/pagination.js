@@ -1,4 +1,5 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { COLORS, applyBrandFooter } from "./responseEmbeds.js";
 
 export const PAGE_SIZE = 8;
 
@@ -23,13 +24,14 @@ export function buildPage(title, entries, page = 0, opts = {}) {
   const pageEntries = entries.slice(start, start + PAGE_SIZE);
 
   const embed = new EmbedBuilder()
-    .setColor(opts.color || 0xC4982A)
+    .setColor(opts.color || COLORS.brand)
     .setDescription(pageEntries.join("\n\n") || "*Nothing here yet.*")
     .setFooter({
       text: `Page ${page + 1} / ${totalPages}  •  ${entries.length} entries${opts.footerSuffix ? "  •  " + opts.footerSuffix : ""}`,
       iconURL: opts.footerIconUrl,
     })
     .setTimestamp();
+  applyBrandFooter(embed);
 
   if (title) embed.setTitle(title);
   if (opts.thumbnailUrl) embed.setThumbnail(opts.thumbnailUrl);

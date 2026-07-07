@@ -7,8 +7,9 @@ import {
 } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
+import { COLORS, applyBrandFooter } from "../responseEmbeds.js";
 
-const PROFILE_COLOR = 0xC4982A;
+const PROFILE_COLOR = COLORS.brand;
 const WEB_BASE_URL = process.env.WEB_HUB_URL || "https://crownguild.com";
 const PROFILE_SECTIONS = ["overview", "crowns", "wishlist", "collection"];
 const SECTION_LABELS = {

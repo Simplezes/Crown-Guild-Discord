@@ -4,11 +4,12 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import db, { setupDatabase } from "./database.js";
-import { pusherServer } from "./pusher.js";
+import { pusherServer, notifyUsers } from "./pusher.js";
 import { refreshFlareEmbed } from "./events/interactionCreate.js";
 import PusherClient from "pusher-js";
 import { formatMonsterName } from "./utils.js";
 import { E } from "./emojis.js";
+import { COLORS, applyBrandFooter } from "./responseEmbeds.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,8 +68,9 @@ channel.bind("flare_updated", async (data) => {
           "",
           `Missions assigned. Use \`/hunt done\` when you get the crown!`,
         ].filter(Boolean).join("\n"))
-        .setColor(0x2ECC71)
+        .setColor(COLORS.success)
         .setTimestamp();
+      applyBrandFooter(embed);
 
       const doneRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId("quest_started_web").setLabel("Quest Started").setStyle(ButtonStyle.Success).setDisabled(true)
@@ -145,7 +147,7 @@ async function pollWebNotifications() {
 
     for (const row of res.rows) {
       try {
-        await pusherServer.trigger("public-channel", "notification", {
+        await notifyUsers([row.recipient_id], "notification", {
           id: row.id,
           type: row.type,
           requester_name: row.requester_name,
@@ -176,8 +178,9 @@ async function pollWebNotifications() {
                 .setTitle(`${E.linkParty} SOS Beacon Received!`)
                 .setDescription(`**${row.requester_name}** has sent an SOS flare for your ${row.emoji} **${targetName}** (${typeEmoji} ${typeLabel}) on the website!`)
                 .addFields({ name: "Action Required", value: "Click below to accept this request and start the mission." })
-                .setColor(0xE67E22)
+                .setColor(COLORS.urgent)
                 .setTimestamp();
+              applyBrandFooter(embed);
 
               const buttons = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -217,9 +220,10 @@ async function pollWebNotifications() {
               const embed = new EmbedBuilder()
                 .setTitle("<:MHWildsHunt_Icon:1500270140682404001> Mission Undergoing!")
                 .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${row.host_id}>\n**Requester:** <@${row.user_id}>\n**Target:** ${row.emoji || E.hunt} **${targetName}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/complete\`!`)
-                .setColor(0x3498DB)
+                .setColor(COLORS.brand)
                 .setTimestamp();
-              
+              applyBrandFooter(embed);
+
               const msg = await requester.send({ embeds: [embed] }).catch(() => null);
               if (msg) {
                 discordMsgId = msg.id;
@@ -278,23 +282,26 @@ async function syncAcceptedToDiscord() {
           const embed = new EmbedBuilder()
             .setTitle("<:MHWildsHunt_Icon:1500270140682404001> Mission Undergoing!")
             .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${row.recipient_id}>\n**Requester:** <@${row.user_id}>\n**Target:** ${row.monster_emoji || E.hunt} **${displayParts}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/complete\`!`)
-            .setColor(0x3498DB)
+            .setColor(COLORS.brand)
             .setTimestamp();
+          applyBrandFooter(embed);
 
           await msg.edit({ embeds: [embed], components: [] }).catch(() => { });
         } else if (row.status === 'declined') {
           const embed = new EmbedBuilder()
             .setTitle("<:MHWildsNotes_Checkmark_Icon:1500270149725327370> Hunt Request Declined")
             .setDescription(`The host has declined the hunt request for **${row.monster_name}**.`)
-            .setColor(0xE74C3C)
+            .setColor(COLORS.danger)
             .setTimestamp();
+          applyBrandFooter(embed);
           await msg.edit({ embeds: [embed], components: [] }).catch(() => { });
         } else if (row.status === 'cancelled') {
           const embed = new EmbedBuilder()
             .setTitle("Request Cancelled")
             .setDescription(`This SOS flare for **${row.monster_name}** is no longer active. Another host may have accepted it.`)
-            .setColor(0x95A5A6)
+            .setColor(COLORS.neutral)
             .setTimestamp();
+          applyBrandFooter(embed);
           await msg.edit({ embeds: [embed], components: [] }).catch(() => { });
         }
 
@@ -352,8 +359,9 @@ async function checkExpiredMissions() {
           "",
           `Did you complete the hunt and get the crown?`
         ].join("\n"))
-        .setColor(0xE67E22)
+        .setColor(COLORS.warning)
         .setTimestamp();
+      applyBrandFooter(embed);
 
       const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -386,8 +394,9 @@ async function checkExpiredMissions() {
           "",
           `Hunters have been prompted to confirm if they completed the hunt.`
         ].join("\n"))
-        .setColor(0xE67E22)
+        .setColor(COLORS.warning)
         .setTimestamp();
+      applyBrandFooter(embed);
 
       const host = await client.users.fetch(mission.host_id).catch(() => null);
       if (host) await host.send({ embeds: [embed] }).catch(() => {});

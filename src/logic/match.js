@@ -2,6 +2,7 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import db from "../database.js";
 import { E } from "../emojis.js";
 import { resolveMonsterName } from "../utils.js";
+import { COLORS, applyBrandFooter } from "../responseEmbeds.js";
 
 export default {
   async execute(interaction) {
@@ -148,9 +149,9 @@ export default {
         "",
         ...matchLines,
       ].join("\n"))
-      .setColor(0xF1C40F)
-      .setFooter({ text: "Contact these hunters to coordinate your hunt!" })
+      .setColor(COLORS.warning)
       .setTimestamp();
+    applyBrandFooter(embed, "Contact these hunters to coordinate your hunt!");
 
     return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },

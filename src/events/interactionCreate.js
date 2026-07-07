@@ -6,7 +6,8 @@ import addLogic from "../logic/add.js";
 import { randomUUID } from "crypto";
 import { capitalize, formatMonsterName, deductInvestigationUse } from "../utils.js";
 import { SOS_DISABLED_MESSAGE, SOS_FEATURE_ENABLED } from "../featureFlags.js";
-import { ephemeralStatus } from "../responseEmbeds.js";
+import { ephemeralStatus, COLORS, applyBrandFooter } from "../responseEmbeds.js";
+import { notifyUsers } from "../pusher.js";
 
 export async function refreshFlareEmbed(client, flareId) {
   try {
@@ -227,7 +228,7 @@ export default {
           const targetAvatar = target ? target.displayAvatarURL() : undefined;
 
           opts = {
-            color: 0xC4982A,
+            color: COLORS.brand,
             authorName: `${targetName}  •  Crown Collection`,
             authorIconUrl: targetAvatar,
             thumbnailUrl: `${WEB_BASE_URL}/icon.png`,
@@ -269,7 +270,7 @@ export default {
           });
 
           opts = {
-            color: 0xC4982A,
+            color: COLORS.brand,
             authorName: "Crown Guild  •  Crown Registry",
             authorIconUrl: `${WEB_BASE_URL}/icon.png`,
             thumbnailUrl: `${WEB_BASE_URL}/icon.png`,
@@ -440,7 +441,7 @@ export default {
                   VALUES (?, ?, ?, 'hunt_accepted', ?, (SELECT id FROM crowns WHERE user_id = ? AND monster_id = ? AND type = ? LIMIT 1), 'pending')`,
             args: [hunter.user_id, userId, hunter.user_id, flare.monster_id, userId, flare.monster_id, flare.type]
           });
-          await interaction.client.pusher.trigger("public-channel", "notification", {
+          await notifyUsers([hunter.user_id], "notification", {
             type: 'hunt_accepted',
             recipient_id: hunter.user_id
           }).catch(() => { });
@@ -448,7 +449,7 @@ export default {
 
         await db.execute({ sql: "DELETE FROM active_flares WHERE id = ?", args: [flareId] });
         await interaction.client.pusher.trigger("public-channel", "flare_updated", { type: 'started' }).catch(() => { });
-        await interaction.client.pusher.trigger("public-channel", "mission_update", {}).catch(() => { });
+        await notifyUsers([userId, ...hunters.map(h => h.user_id)], "mission_update", {}).catch(() => { });
         await interaction.client.pusher.trigger("public-channel", "notification_updated", {}).catch(() => { });
 
         const displayName = formatMonsterName(flare.monster_name, flare.tempered);
@@ -470,8 +471,9 @@ export default {
             "",
             `Missions assigned. Use \`/hunt done\` when you get the crown!`,
           ].filter(Boolean).join("\n"))
-          .setColor(0x2ECC71)
+          .setColor(COLORS.success)
           .setTimestamp();
+        applyBrandFooter(embed);
 
         const doneRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`quest_started_1`).setLabel("Quest Started").setStyle(ButtonStyle.Success).setDisabled(true)
@@ -505,6 +507,7 @@ export default {
 
           const groupRes = await db.execute({ sql: "SELECT * FROM active_missions WHERE group_id = ?", args: [mission.group_id] });
           const allConfirmed = groupRes.rows.every(m => m.hunter_confirmed === 1);
+          const groupRecipients = [...new Set([groupRes.rows[0]?.host_id, ...groupRes.rows.map(m => m.requester_id)])];
 
           if (allConfirmed) {
             for (const m of groupRes.rows) {
@@ -524,10 +527,10 @@ export default {
             const fm = groupRes.rows[0];
             await deductInvestigationUse(fm.host_id, fm.monster_id, fm.type, fm.tempered, fm.strength_rating);
             await db.execute({ sql: "DELETE FROM active_missions WHERE group_id = ?", args: [mission.group_id] });
-            interaction.client.pusher?.trigger("public-channel", "mission_update", { status: 'completed', groupId: mission.group_id }).catch(() => {});
+            notifyUsers(groupRecipients, "mission_update", { status: 'completed', groupId: mission.group_id }).catch(() => {});
             interaction.client.pusher?.trigger("public-channel", "crown_update", {}).catch(() => {});
           } else {
-            interaction.client.pusher?.trigger("public-channel", "mission_update", { type: 'group_confirmed' }).catch(() => {});
+            notifyUsers(groupRecipients, "mission_update", { type: 'group_confirmed' }).catch(() => {});
           }
 
           const embed = new EmbedBuilder()
@@ -535,7 +538,8 @@ export default {
             .setDescription(allConfirmed
               ? `All hunters confirmed! Quest complete for **${displayName}**.`
               : `Your crown for **${displayName}** has been logged. Waiting for other hunters...`)
-            .setColor(0x2ECC71).setTimestamp();
+            .setColor(COLORS.success).setTimestamp();
+          applyBrandFooter(embed);
           return interaction.update({ embeds: [embed], components: [] });
         } else {
           await db.execute({
@@ -543,13 +547,14 @@ export default {
             args: [mission.host_id, mission.requester_id, mission.monster_id, mission.type, mission.tempered, mission.strength_rating]
           });
           await db.execute({ sql: "DELETE FROM active_missions WHERE id = ?", args: [mission.id] });
-          interaction.client.pusher?.trigger("public-channel", "mission_update", { status: 'completed', hostId: mission.host_id, requesterId: mission.requester_id }).catch(() => {});
+          notifyUsers([mission.host_id, mission.requester_id], "mission_update", { status: 'completed', hostId: mission.host_id, requesterId: mission.requester_id }).catch(() => {});
           interaction.client.pusher?.trigger("public-channel", "crown_update", {}).catch(() => {});
 
           const embed = new EmbedBuilder()
             .setTitle(`${E.notesCheckmark} Mission Complete!`)
             .setDescription(`Crown confirmed for **${displayName}** (${typeLabel})!`)
-            .setColor(0x2ECC71).setTimestamp();
+            .setColor(COLORS.success).setTimestamp();
+          applyBrandFooter(embed);
           return interaction.update({ embeds: [embed], components: [] });
         }
 
@@ -558,18 +563,19 @@ export default {
         const userId = interaction.user.id;
         const { EmbedBuilder } = await import("discord.js");
 
-        const missionRes = await db.execute({ sql: "SELECT 1 FROM active_missions WHERE id = ? AND requester_id = ?", args: [missionId, userId] });
+        const missionRes = await db.execute({ sql: "SELECT host_id FROM active_missions WHERE id = ? AND requester_id = ?", args: [missionId, userId] });
         if (missionRes.rows.length === 0) {
           return interaction.update({ content: "This mission has already been resolved.", embeds: [], components: [] });
         }
 
         await db.execute({ sql: "DELETE FROM active_missions WHERE id = ?", args: [missionId] });
-        interaction.client.pusher?.trigger("public-channel", "mission_update", { status: 'expired', requesterId: userId }).catch(() => {});
+        notifyUsers([userId, missionRes.rows[0].host_id], "mission_update", { status: 'expired', requesterId: userId }).catch(() => {});
 
         const embed = new EmbedBuilder()
           .setTitle("Mission Expired")
           .setDescription("Your mission has been marked as expired and removed.")
-          .setColor(0x95A5A6).setTimestamp();
+          .setColor(COLORS.neutral).setTimestamp();
+        applyBrandFooter(embed);
         return interaction.update({ embeds: [embed], components: [] });
 
       } else if (customId.startsWith("accept_req_") || customId.startsWith("host_choose_")) {
@@ -636,7 +642,7 @@ export default {
             const promptEmbed = new EmbedBuilder()
               .setTitle(`${mEmoji} Host Selection: ${mName}`)
               .setDescription(`You own multiple versions of the ${typeEmoji} **${typeLabel}** for this monster.\nSelect which one you want to host for <@${requesterId}>:`)
-              .setColor(0xC4982A)
+              .setColor(COLORS.brand)
               .addFields(
                 { name: `${typeEmoji} Normal Crown`, value: formatCrown(bestNormal), inline: true },
                 { name: `${E.tempered} Tempered Crown`, value: formatCrown(bestTempered), inline: true }
@@ -700,7 +706,6 @@ export default {
           sql: "UPDATE web_notifications SET status = 'cancelled' WHERE user_id = ? AND status IN ('pending', 'sent') AND type IN ('sos_flare', 'beacon')",
           args: [requesterId]
         });
-        if (interaction.client.pusher) interaction.client.pusher.trigger('public-channel', 'notification_updated', {});
 
         await db.execute({
           sql: `INSERT INTO web_notifications (user_id, host_id, recipient_id, type, monster_id, crown_id, status) 
@@ -708,18 +713,19 @@ export default {
           args: [requesterId, hostId, requesterId, Number(monsterId), hostId, Number(monsterId), type]
         });
 
+        notifyUsers([requesterId], "notification_remove", {
+          id: notifId,
+          user_id: requesterId,
+          monster_id: Number(monsterId)
+        });
+        notifyUsers([requesterId], "notification", {
+          type: 'hunt_accepted',
+          recipient_id: requesterId
+        });
+        notifyUsers([hostId, requesterId], "mission_update", {});
         if (interaction.client.pusher) {
-          interaction.client.pusher.trigger("public-channel", "notification_remove", {
-            id: notifId,
-            user_id: requesterId,
-            monster_id: Number(monsterId)
-          });
-          interaction.client.pusher.trigger("public-channel", "notification", {
-            type: 'hunt_accepted',
-            recipient_id: requesterId
-          });
-          interaction.client.pusher.trigger("public-channel", "mission_update", {});
           interaction.client.pusher.trigger("public-channel", "crown_update", {});
+          interaction.client.pusher.trigger("public-channel", "notification_updated", {});
         }
 
         const monsterRes = await db.execute({
@@ -742,7 +748,8 @@ export default {
         const embed = new EmbedBuilder()
           .setTitle("<:MHWildsHunt_Icon:1500270140682404001> Mission Undergoing!")
           .setDescription(`<:MHWildsQuest_Members_Icon:1500270237323366400> **Host:** <@${hostId}>\n**Requester:** <@${requesterId}>\n**Target:** ${m.emoji || E.hunt} **${displayParts}** (${typeLabel})\n\n<:MHWildsLobby_Icon:1500270248647987300> ${lobbyInfo}${passInfo}\n\nOnce the mission is completed, please send \`/hunt done\`!`)
-          .setColor(0x3498DB);
+          .setColor(COLORS.brand);
+        applyBrandFooter(embed);
 
         if (isChoose) {
           try {
@@ -777,7 +784,8 @@ export default {
         const embed = new EmbedBuilder()
           .setTitle("Collection Cleared")
           .setDescription(`All **${res.rowsAffected}** crowns have been permanently deleted from your collection.`)
-          .setColor(0xed4245);
+          .setColor(COLORS.danger);
+        applyBrandFooter(embed);
 
         await interaction.update({ embeds: [embed], components: [] });
         if (interaction.client.pusher) {
@@ -795,7 +803,7 @@ export default {
         const embed = new EmbedBuilder()
           .setTitle("Cancelled")
           .setDescription("Your collection is safe. No crowns were removed.")
-          .setColor(0x95A5A6);
+          .setColor(COLORS.neutral);
 
         await interaction.update({ embeds: [embed], components: [] });
       } else if (customId.startsWith("confirm_delete_account_init_")) {
@@ -809,7 +817,7 @@ export default {
         const embed = new EmbedBuilder()
           .setTitle("Final Warning: Account Deletion")
           .setDescription("This will permanently delete your entire profile, including all collected crowns and mission history. **This cannot be undone.**\n\nAre you absolutely sure?")
-          .setColor(0xED4245);
+          .setColor(COLORS.danger);
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
@@ -843,13 +851,13 @@ export default {
         const embed = new EmbedBuilder()
           .setTitle("Account Deleted")
           .setDescription("Your account and all associated data have been removed from the Guild Registry.")
-          .setColor(0x2B2D31);
+          .setColor(COLORS.neutral);
 
         await interaction.update({ embeds: [embed], components: [] });
         if (interaction.client.pusher) {
           interaction.client.pusher.trigger("public-channel", "crown_update", {});
-          interaction.client.pusher.trigger("public-channel", "mission_update", {});
         }
+        notifyUsers([ownerId], "mission_update", {});
 
       } else if (customId.startsWith("cancel_delete_account_")) {
         const ownerId = customId.replace("cancel_delete_account_", "");
@@ -862,7 +870,7 @@ export default {
         const embed = new EmbedBuilder()
           .setTitle("Deletion Cancelled")
           .setDescription("Your account is safe.")
-          .setColor(0x95A5A6);
+          .setColor(COLORS.neutral);
 
         await interaction.update({ embeds: [embed], components: [] });
       }

@@ -13,7 +13,7 @@ import db from "../database.js";
 import { handleMonsterAutocomplete, resolveMonsterName, capitalize, formatMonsterName } from "../utils.js";
 import { E } from "../emojis.js";
 import crypto from "crypto";
-import { ephemeralStatus } from "../responseEmbeds.js";
+import { ephemeralStatus, COLORS, applyBrandFooter } from "../responseEmbeds.js";
 
 const WEB_BASE_URL = process.env.WEB_HUB_URL;
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -90,9 +90,9 @@ function buildConfigEmbed(session) {
   const embed = new EmbedBuilder()
     .setTitle(`${monster.emoji || E.hunt} Crown Add Configurator`)
     .setDescription(lines.join("\n"))
-    .setColor(0xC4982A)
-    .setFooter({ text: "Use dropdowns and buttons, then submit." })
+    .setColor(COLORS.brand)
     .setTimestamp();
+  applyBrandFooter(embed, "Use dropdowns and buttons, then submit.");
 
   if (monster.image_name) {
     embed.setThumbnail(`${WEB_BASE_URL}/monsters/${monster.image_name}`);
@@ -275,8 +275,9 @@ async function saveCrownEntry(interaction, session) {
   const embed = new EmbedBuilder()
     .setTitle(`${monster.emoji || E.hunt} Crown Added!`)
     .setDescription(lines.join("\n"))
-    .setColor(0x57f287)
+    .setColor(COLORS.success)
     .setTimestamp();
+  applyBrandFooter(embed);
 
   if (interaction.client.pusher) {
     interaction.client.pusher.trigger("public-channel", "crown_update", {});
@@ -457,7 +458,7 @@ export default {
           new EmbedBuilder()
             .setTitle("Cancelled")
             .setDescription("Crown entry was cancelled.")
-            .setColor(0x95A5A6),
+            .setColor(COLORS.neutral),
         ],
         components: [],
       });

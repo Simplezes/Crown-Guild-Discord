@@ -2,7 +2,7 @@ import { EmbedBuilder, MessageFlags } from "discord.js";
 import { handleMonsterAutocomplete, resolveMonsterName } from "../utils.js";
 import path from "path";
 import fs from "fs";
-import { ephemeralStatus } from "../responseEmbeds.js";
+import { ephemeralStatus, COLORS, applyBrandFooter } from "../responseEmbeds.js";
 import { E } from "../emojis.js";
 
 export default {
@@ -42,12 +42,13 @@ export default {
     const embed = new EmbedBuilder()
       .setTitle(`${monster.emoji || E.hunt} ${mName}`)
       .setDescription(monsterData.description || "No description available.")
-      .setColor(0xC4982A)
+      .setColor(COLORS.brand)
       .addFields(
         { name: "Type", value: monsterData.type || "Unknown", inline: true },
         { name: "Elements", value: monsterData.elements?.join(", ") || "None", inline: true },
         { name: "Ailments", value: monsterData.ailments?.join(", ") || "None", inline: true }
       );
+    applyBrandFooter(embed);
 
     if (monsterData.weaknesses) {
       const weakStr = Object.entries(monsterData.weaknesses)

@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { E } from "../emojis.js";
 import { SOS_FEATURE_ENABLED } from "../featureFlags.js";
+import { COLORS } from "../responseEmbeds.js";
 
 const huntActions = SOS_FEATURE_ENABLED
   ? [
@@ -103,7 +104,7 @@ export default {
       const embed = new EmbedBuilder()
         .setAuthor({ name: "Crown Guild  •  Group Help", iconURL: "attachment://icon.png" })
         .setTitle(group.title)
-        .setColor(0xC4982A)
+        .setColor(COLORS.brand)
         .addFields(...group.fields)
         .setFooter({ text: "Run /help to see all categories", iconURL: "attachment://icon.png" });
 
@@ -112,7 +113,7 @@ export default {
 
     const embed = new EmbedBuilder()
       .setAuthor({ name: "Crown Guild  •  Command Guide", iconURL: "attachment://icon.png" })
-      .setColor(0xC4982A)
+      .setColor(COLORS.brand)
       .setThumbnail("attachment://icon.png")
       .setDescription("The Crown Guild is now easier to navigate! Use the grouped commands below:")
       .addFields(
